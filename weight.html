@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>條碼重量管理系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        .weight-display {
+            font-size: 24px;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            text-align: center;
+        }
+        .submit-btn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .submit-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        
+        <div class="form-group">
+            <label for="user">填寫人：</label>
+            <select id="user" v-model="selectedUser" @change="onUserSelect">
+                <option value="">請選擇填寫人</option>
+                <option v-for="user in users" :key="user.id" :value="user.id">
+                    {{ user.name }}
+                </option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="barcode">條碼編號：</label>
+            <input type="text" id="barcode" v-model="barcode" @input="onBarcodeInput"
+                   placeholder="請掃描或輸入條碼" :disabled="!selectedUser">
+        </div>
+
+        <div>
+            <h3>產品資訊：</h3>
+            <p>產品名稱：{{ productInfo ? productInfo.product_name : '尚未掃描條碼' }}</p>
+            <p>規格：{{ productInfo ? productInfo.specifications : '尚未掃描條碼' }}</p>
+            
+            <div class="weight-display">
+                目前重量：{{ currentWeight }} kg
+            </div>
+
+            <button class="submit-btn" 
+                    @click="submitData" 
+                    :disabled="!canSubmit">
+                送出資料
+            </button>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                users: [],
+                selectedUser: '',
+                barcode: '',
+                productInfo: null,
+                currentWeight: 0,
+                weightInterval: null,
+                canSubmit: false
+            },
+            methods: {
+                fetchUsers() {
+                    axios.get('api.php?action=getUsers')
+                        .then(response => {
+                            this.users = response.data;
+                        })
+                        .catch(error => {
+                            console.error('Error fetching users:', error);
+                            alert('獲取使用者資料失敗');
+                        });
+                },
+                onUserSelect() {
+                    this.barcode = '';
+                    this.productInfo = null;
+                    this.stopWeightMonitoring();
+                },
+                onBarcodeInput() {
+                    if (this.barcode.length >= 5) {  // 假設條碼最少5位
+                        this.fetchProductInfo();
+                    }
+                },
+                fetchProductInfo() {
+                    axios.get(`api.php?action=getProduct&barcode=${this.barcode}`)
+                        .then(response => {
+                            this.productInfo = response.data;
+                            this.startWeightMonitoring();
+                        })
+                        .catch(error => {
+                            console.error('Error fetching product:', error);
+                            alert('獲取產品資料失敗');
+                        });
+                },
+                startWeightMonitoring() {
+                    this.stopWeightMonitoring();
+                    this.weightInterval = setInterval(() => {
+                        axios.get('api.php?action=getWeight')
+                            .then(response => {
+                                this.currentWeight = response.data.weight;
+                                this.canSubmit = true;
+                            })
+                            .catch(error => {
+                                console.error('Error getting weight:', error);
+                            });
+                    }, 500);  // 每500ms更新一次
+                },
+                stopWeightMonitoring() {
+                    if (this.weightInterval) {
+                        clearInterval(this.weightInterval);
+                        this.weightInterval = null;
+                    }
+                },
+                submitData() {
+                    const data = {
+                        user_id: this.selectedUser,
+                        barcode: this.barcode,
+                        weight: this.currentWeight
+                    };
+
+                    axios.post('api.php?action=saveRecord', data)
+                        .then(response => {
+                            alert('資料儲存成功！');
+                            this.resetForm();
+                        })
+                        .catch(error => {
+                            console.error('Error saving data:', error);
+                            alert('資料儲存失敗');
+                        });
+                },
+                resetForm() {
+                    this.barcode = '';
+                    this.productInfo = null;
+                    this.currentWeight = 0;
+                    this.canSubmit = false;
+                    this.stopWeightMonitoring();
+                }
+            },
+            mounted() {
+                this.fetchUsers();
+            },
+            beforeDestroy() {
+                this.stopWeightMonitoring();
+            }
+        });
+    </script>
+</body>
+</html>

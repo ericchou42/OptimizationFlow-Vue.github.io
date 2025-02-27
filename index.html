@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系統登入</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+        .login-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .error-message {
+            color: red;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="login-container">
+            <h2>系統登入</h2>
+            <form @submit.prevent="handleLogin">
+                <div class="form-group">
+                    <label for="username">帳號：</label>
+                    <input type="text" id="username" v-model="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密碼：</label>
+                    <input type="password" id="password" v-model="password" required>
+                </div>
+                <button type="submit" :disabled="isLoading">
+                    {{ isLoading ? '登入中...' : '登入' }}
+                </button>
+                <p v-if="error" class="error-message">{{ error }}</p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    username: '',
+                    password: '',
+                    error: '',
+                    isLoading: false
+                };
+            },
+            mounted() {
+                this.checkSession();
+            },
+            methods: {
+                async checkSession() {
+                    try {
+                        const response = await fetch('backend/check_session.php');
+                        const data = await response.json();
+                        if (data.success) {
+                            window.location.href = 'import.html';
+                        }
+                    } catch (error) {
+                        console.error('Session check failed:', error);
+                    }
+                },
+                async handleLogin() {
+                    this.isLoading = true;
+                    this.error = '';
+                    
+                    try {
+                        const response = await fetch('backend/login.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                username: this.username,
+                                password: this.password
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            window.location.href = 'import.html';
+                        } else {
+                            this.error = data.message || '登入失敗';
+                        }
+                    } catch (error) {
+                        this.error = '系統錯誤，請稍後再試';
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

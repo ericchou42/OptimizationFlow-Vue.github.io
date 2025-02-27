@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系統管理</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .nav-bar {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+        .nav-bar a {
+            display: inline-block;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: #333;
+            cursor: pointer;
+        }
+        .nav-bar a.active {
+            background: #4CAF50;
+            color: white;
+            border-radius: 4px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logout-button {
+            padding: 5px 10px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .logout-button:hover {
+            background: #c82333;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .content-area {
+            padding: 20px;
+        }
+        .file-input {
+            margin: 20px 0;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        iframe {
+            width: 100%;
+            height: 800px;
+            border: none;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div v-if="isLoading" class="loading">
+            載入中...
+        </div>
+        <div v-else>
+            <div class="nav-bar">
+                <div class="nav-content">
+                    <div class="nav-links">
+                        <a 
+                            v-for="page in pages" 
+                            :key="page.id"
+                            :class="{ active: currentPage === page.id }"
+                            @click="changePage(page.id)"
+                        >{{ page.name }}</a>
+                    </div>
+                    <div v-if="isLoggedIn" class="user-info">
+                        <span>{{ username }}</span>
+                        <button @click="logout" class="logout-button">登出</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- 資料匯入頁面 -->
+                <div v-if="currentPage === 'import'">
+                    <h2>Excel 匯入管理</h2>
+                    <input type="file" @change="handleFile" class="file-input" accept=".xlsx,.xls">
+                    <div v-if="message" :class="['message', messageType]">
+                        {{ message }}
+                    </div>
+                </div>
+
+                <!-- 其他頁面使用 iframe 載入 -->
+                <iframe 
+                    v-else
+                    :key="iframeKey"
+                    :src="currentPageUrl"
+                    @load="handleIframeLoad"
+                ></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const app = Vue.createApp({
+            data() {
+                return {
+                    isLoading: true,
+                    isLoggedIn: false,
+                    username: '',
+                    currentPage: 'import',
+                    messageType: 'success',
+                    message: '',
+                    iframeKey: 0,
+                    pages: [
+                        { id: 'import', name: '資料匯入' },
+                        { id: 'query', name: '生產排程' },
+                        { id: 'vehicle', name: '車台狀況' },
+                        { id: 'barcodePrint', name: '條碼列印' },
+                        { id: 'weight', name: '秤重' }
+                    ]
+                };
+            },
+            computed: {
+                currentPageUrl() {
+                    // 添加時間戳記以防止快取
+                    const timestamp = new Date().getTime();
+                    return `${this.currentPage}.html?t=${timestamp}`;
+                }
+            },
+            mounted() {
+                this.checkSession();
+                // 監聽來自 iframe 的消息
+                window.addEventListener('message', this.handleIframeMessage);
+            },
+            beforeUnmount() {
+                // 移除事件監聽器
+                window.removeEventListener('message', this.handleIframeMessage);
+            },
+            methods: {
+                async checkSession() {
+                    try {
+                        const response = await fetch('backend/check_session.php', {
+                            credentials: 'include'
+                        });
+                        
+                        if (!response.ok) throw new Error('Network response was not ok');
+
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.isLoggedIn = true;
+                            this.username = data.username;
+                        } else {
+                            window.location.href = 'login.html';
+                        }
+                    } catch (error) {
+                        console.error('Session check failed:', error);
+                        window.location.href = 'login.html';
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async logout() {
+                    try {
+                        const response = await fetch('backend/logout.php', {
+                            credentials: 'include'
+                        });
+                        
+                        if (!response.ok) throw new Error('Logout failed');
+                        
+                        window.location.href = 'login.html';
+                    } catch (error) {
+                        console.error('Logout failed:', error);
+                        this.message = '登出失敗，請稍後再試';
+                        this.messageType = 'error';
+                    }
+                },
+
+                changePage(pageId) {
+                    this.currentPage = pageId;
+                    this.message = '';
+                    // 更新 iframe key 來強制重新載入
+                    this.iframeKey++;
+                },
+
+                handleIframeLoad(event) {
+                    // iframe 載入完成後的處理
+                    console.log('iframe loaded:', this.currentPage);
+                },
+
+                handleIframeMessage(event) {
+                    // 處理來自 iframe 的消息
+                    if (event.data && event.data.type) {
+                        switch (event.data.type) {
+                            case 'error':
+                                this.message = event.data.message;
+                                this.messageType = 'error';
+                                break;
+                            case 'success':
+                                this.message = event.data.message;
+                                this.messageType = 'success';
+                                break;
+                            case 'reload':
+                                // 重新載入當前頁面
+                                this.iframeKey++;
+                                break;
+                        }
+                    }
+                },
+
+                async handleFile(event) {
+                    this.file = event.target.files[0];
+                    let reader = new FileReader();
+                    
+                    reader.onload = async (e) => {
+                        let data = new Uint8Array(e.target.result);
+                        let workbook = XLSX.read(data, { type: 'array' });
+                        let sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        
+                        let json = XLSX.utils.sheet_to_json(sheet, {
+                            header: 1,
+                            defval: "",
+                            raw: false,
+                            dateNF: "yyyy-mm-dd",
+                            range: 1
+                        });
+
+                        const headers = json[0] || [];
+                        const rows = json.slice(1).map(row => {
+                            let obj = {};
+                            headers.forEach((header, index) => {
+                                obj[header] = row[index] !== undefined ? String(row[index]).trim() : "";
+                            });
+                            return obj;
+                        });
+
+                        try {
+                            let res = await fetch("backend/upload.php", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ rows: rows })
+                            });
+
+                            let result = await res.json();
+                            if (result.success) {
+                                this.message = `✅ 資料上傳成功！共處理 ${result.inserted} 筆資料`;
+                                this.messageType = 'success';
+                            } else {
+                                this.message = `❌ 上傳失敗：${result.message}`;
+                                this.messageType = 'error';
+                            }
+                        } catch (error) {
+                            console.error("上傳錯誤:", error);
+                            this.message = "❌ 無法連線到後端，請檢查網路連線或聯絡系統管理員";
+                            this.messageType = 'error';
+                        }
+                    };
+
+                    reader.readAsArrayBuffer(this.file);
+                }
+            }
+        });
+
+        app.mount("#app");
+    </script>
+</body>
+</html>
