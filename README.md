@@ -1,3 +1,4 @@
+```
 vue/
 │── backend/               # PHP API 後端
 │   ├── config.php         # 資料庫連線
@@ -12,3 +13,4 @@ vue/
 │── weight.html        # 重量輸入
 │── database.sql           # MySQL 建表語法
 │── README.md              # 專案說明
+```
