@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>車台查詢系統</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         /* 基本頁面樣式 */
         body {
@@ -97,6 +98,30 @@
             white-space: normal;
             word-break: break-word;
         }
+        
+        /* 下拉選單樣式 */
+        .select2-container {
+            width: 100% !important;
+        }
+        
+        /* 儲存按鈕樣式 */
+        .save-btn {
+            font-size: 0.8rem;
+            padding: 2px 5px;
+            margin-left: 5px;
+        }
+        
+        /* 修改成功樣式 */
+        .save-success {
+            background-color: #d4edda;
+            transition: background-color 0.5s;
+        }
+        
+        /* 修改失敗樣式 */
+        .save-error {
+            background-color: #f8d7da;
+            transition: background-color 0.5s;
+        }
     </style>
 </head>
 <body>
@@ -113,6 +138,11 @@
             <!-- 錯誤訊息顯示 -->
             <div v-if="error" class="alert alert-danger">
                 {{ error }}
+            </div>
+            
+            <!-- 訊息通知 -->
+            <div v-if="message" class="alert" :class="messageType">
+                {{ message }}
             </div>
             
             <!-- 主要內容區域 -->
@@ -134,6 +164,7 @@
                                 <th>工單號碼</th>
                                 <th>預排工單</th>
                                 <th>架機日期</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -142,19 +173,31 @@
                                 <!-- 車台資料群組 -->
                                 <template v-if="item.data && item.data.length > 0">
                                     <tr v-for="(entry, idx) in item.data" :key="`${index}-${idx}`"
-                                        :class="{ 'highlight': isHighlighted(item, entry) }">
+                                        :class="{ 'highlight': isHighlighted(item, entry) }"
+                                        :id="`row-${item.car}-${idx}`">
                                         <!-- 只在該車台的第一筆資料顯示車台編號，並合併儲存格 -->
                                         <td v-if="idx === 0" :rowspan="item.data.length" class="car-cell">{{ item.car }}</td>
                                         <td class="machine-history-cell wrap-content">{{ entry.machineHistory }}</td>
-                                        <td class="workorder-cell wrap-content">{{ entry.actualWorkOrder }}</td>
+                                        <td class="workorder-cell wrap-content">
+                                            <div class="d-flex">
+                                                <select :id="`actual-workorder-${item.car}-${idx}`" class="form-control workorder-select">
+                                                    <option value="">請選擇工單</option>
+                                                </select>
+                                            </div>
+                                        </td>
                                         <td class="workorder-cell wrap-content">{{ entry.workOrder }}</td>
                                         <td class="date-cell">{{ entry.displayDate }}</td>
+                                        <td class="text-center">
+                                            <button @click="saveWorkOrder(item.car, idx, entry.workOrder)" class="btn btn-sm btn-primary save-btn">
+                                                儲存
+                                            </button>
+                                        </td>
                                     </tr>
                                 </template>
                                 <!-- 無資料顯示 -->
                                 <tr v-else :class="{ 'highlight': searchTerm && item.car.includes(searchTerm) }">
                                     <td class="car-cell">{{ item.car }}</td>
-                                    <td colspan="4" class="no-data">沒有相關資料</td>
+                                    <td colspan="5" class="no-data">沒有相關資料</td>
                                 </tr>
                             </template>
                         </tbody>
@@ -166,8 +209,10 @@
     
     <script src="https://cdn.jsdelivr.net/npm/vue@3.2.20/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
         const app = createApp({
             setup() {
@@ -176,6 +221,9 @@
                 const loading = ref(true);
                 const error = ref(null);
                 const searchTerm = ref('');
+                const workOrders = ref([]);
+                const message = ref('');
+                const messageType = ref('');
                 
                 // 搜尋過濾功能
                 const filteredData = computed(() => {
@@ -225,6 +273,7 @@
                             // 在數據加載後，添加延遲以確保表格已渲染
                             setTimeout(() => {
                                 adjustTableColumns();
+                                initializeSelectDropdowns();
                             }, 100);
                         }
                     } catch (err) {
@@ -232,6 +281,119 @@
                     } finally {
                         loading.value = false;
                     }
+                };
+                
+                // 獲取工單下拉選單資料
+                const fetchWorkOrders = async () => {
+                    try {
+                        const response = await axios.get('./backend/get_work_orders.php');
+                        if (response.data.error) {
+                            error.value = response.data.error;
+                        } else {
+                            workOrders.value = response.data;
+                        }
+                    } catch (err) {
+                        error.value = `獲取工單數據失敗: ${err.message}`;
+                    }
+                };
+                
+                // 初始化下拉選單
+                const initializeSelectDropdowns = () => {
+                    nextTick(() => {
+                        const selects = document.querySelectorAll('.workorder-select');
+                        selects.forEach(select => {
+                            // 清空現有選項(除了第一個)
+                            while (select.options.length > 1) {
+                                select.remove(1);
+                            }
+                            
+                            // 添加所有工單選項
+                            workOrders.value.forEach(workOrder => {
+                                const option = document.createElement('option');
+                                option.value = workOrder.工單號;
+                                option.textContent = `${workOrder.工單號} - ${workOrder.品名}`;
+                                select.appendChild(option);
+                            });
+                            
+                            // 初始化 Select2
+                            $(select).select2({
+                                placeholder: '請選擇工單',
+                                allowClear: true
+                            });
+
+                            // 如果有現有值，則設置
+                            const [_, carId, idx] = select.id.split('-').slice(-3);
+                            const carItem = data.value.find(item => item.car === carId);
+                            if (carItem && carItem.data && carItem.data[idx] && carItem.data[idx].actualWorkOrder) {
+                                $(select).val(carItem.data[idx].actualWorkOrder).trigger('change');
+                            }
+                        });
+                    });
+                };
+                
+                // 儲存工單資料
+                const saveWorkOrder = async (car, idx, defaultWorkOrder) => {
+                    const selectId = `actual-workorder-${car}-${idx}`;
+                    const select = document.getElementById(selectId);
+                    const workOrderValue = select.value || defaultWorkOrder;
+                    
+                    if (!workOrderValue) {
+                        showMessage('請選擇工單號碼', 'alert-warning');
+                        return;
+                    }
+                    
+                    try {
+                        const response = await axios.post('./backend/save_work_order.php', {
+                            car: car,
+                            workOrder: workOrderValue,
+                            preWorkOrder: defaultWorkOrder
+                        });
+                        
+                        if (response.data.success) {
+                            // 更新本地數據
+                            const carItem = data.value.find(item => item.car === car);
+                            if (carItem && carItem.data && carItem.data[idx]) {
+                                carItem.data[idx].actualWorkOrder = workOrderValue;
+                            }
+                            
+                            // 顯示成功訊息
+                            showMessage('工單資料儲存成功！', 'alert-success');
+                            
+                            // 視覺提示：短暫高亮顯示儲存成功的行
+                            const rowElement = document.getElementById(`row-${car}-${idx}`);
+                            if (rowElement) {
+                                rowElement.classList.add('save-success');
+                                setTimeout(() => {
+                                    rowElement.classList.remove('save-success');
+                                }, 2000);
+                            }
+                        } else {
+                            showMessage(`儲存失敗: ${response.data.error}`, 'alert-danger');
+                            
+                            // 視覺提示：短暫高亮顯示儲存失敗的行
+                            const rowElement = document.getElementById(`row-${car}-${idx}`);
+                            if (rowElement) {
+                                rowElement.classList.add('save-error');
+                                setTimeout(() => {
+                                    rowElement.classList.remove('save-error');
+                                }, 2000);
+                            }
+                        }
+                    } catch (err) {
+                        showMessage(`儲存失敗: ${err.message}`, 'alert-danger');
+                    }
+                };
+                
+                // 顯示訊息
+                const showMessage = (msg, type) => {
+                    message.value = msg;
+                    messageType.value = type;
+                    
+                    // 3秒後自動清除訊息
+                    setTimeout(() => {
+                        message.value = '';
+                        messageType.value = '';
+                    }, 3000);
                 };
                 
                 // 調整表格列寬以適應內容
@@ -243,7 +405,9 @@
                 
                 // 頁面載入時獲取數據
                 onMounted(() => {
-                    fetchData();
+                    fetchWorkOrders().then(() => {
+                        fetchData();
+                    });
                     
                     // 添加窗口大小變化監聽器，以便在瀏覽器大小改變時重新調整表格
                     window.addEventListener('resize', adjustTableColumns);
@@ -255,7 +419,10 @@
                     error,
                     searchTerm,
                     filteredData,
-                    isHighlighted
+                    isHighlighted,
+                    saveWorkOrder,
+                    message,
+                    messageType
                 };
             }
         });
