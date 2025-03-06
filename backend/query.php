@@ -2,7 +2,6 @@
 // 檢查請求的動作類型
 $action = $_GET['action'] ?? '';
 
-// 根據動作執行不同的功能
 switch ($action) {
     case 'get_work_orders':
         getWorkOrders();
@@ -10,9 +9,38 @@ switch ($action) {
     case 'save_work_order':
         saveWorkOrder();
         break;
+    case 'get_machine_status':
+        getMachineStatus();
+        break;
     default:
         getCarData();
         break;
+}
+
+// 獲取所有機台狀態的函數
+function getMachineStatus() {
+    // 引入數據庫連接配置
+    require_once 'config.php';
+
+    // 設置回應類型
+    header('Content-Type: application/json');
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET');
+    header('Access-Control-Allow-Headers: Content-Type');
+
+    try {
+        // 查詢機台狀態
+        $sql = "SELECT id, status_name FROM OMachine_Status ORDER BY id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $statuses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // 返回狀態數據
+        echo json_encode($statuses);
+        
+    } catch (PDOException $e) {
+        echo json_encode(['error' => '查詢失敗: ' . $e->getMessage()]);
+    }
 }
 
 // 獲取車台資料的函數
@@ -56,38 +84,40 @@ function getCarData() {
             ];
         }
         
-        // 處理每一筆數據
-        foreach ($allData as $row) {
-            $machineStr = $row['機台(預)'];
-            $workOrder = $row['工單號'];
-            $installDate = str_replace(['~', '～'], '', $row['架機日期']); // 使用 str_replace 直接移除波浪符號
-            
-            // 將架機日期標準化，移除特殊符號後取得日期
-            if (!empty($installDate)) {
-                // 處理可能的日期格式，例如將2/18轉為2024-02-18
-                if (preg_match('/^(\d{1,2})\/(\d{1,2})$/', $installDate, $matches)) {
-                    $installDate = '2024-' . sprintf("%02d", $matches[1]) . '-' . sprintf("%02d", $matches[2]);
-                }
-            } else {
-                $installDate = '9999-12-31'; // 給無日期的資料一個遠期日期用於排序
-            }
-            
-            // 檢查機台(預)是否包含指定車台
-            foreach ($allCars as $car) {
-                if (strpos($machineStr, $car) !== false) {
-                    // 查詢實際工單
-                    $actualWorkOrder = getActualWorkOrder($car, $pdo);
-                    
-                    $result[$car]['data'][] = [
-                        'workOrder' => $workOrder,
-                        'actualWorkOrder' => $actualWorkOrder,
-                        'machineHistory' => $machineStr,
-                        'installDate' => $installDate,
-                        'displayDate' => $row['架機日期']
-                    ];
-                }
-            }
+// 處理每一筆數據
+foreach ($allData as $row) {
+    $machineStr = $row['機台(預)'];
+    $workOrder = $row['工單號'];
+    $installDate = str_replace(['~', '～'], '', $row['架機日期']);
+    
+    // 將架機日期標準化，移除特殊符號後取得日期
+    if (!empty($installDate)) {
+        // 處理可能的日期格式，例如將2/18轉為2024-02-18
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})$/', $installDate, $matches)) {
+            $installDate = '2024-' . sprintf("%02d", $matches[1]) . '-' . sprintf("%02d", $matches[2]);
         }
+    } else {
+        $installDate = '9999-12-31'; // 給無日期的資料一個遠期日期用於排序
+    }
+    
+    // 檢查機台(預)是否包含指定車台
+    foreach ($allCars as $car) {
+        if (strpos($machineStr, $car) !== false) {
+            // 查詢實際工單和狀態
+            $actualInfo = getActualWorkOrder($car, $pdo);
+            
+            $result[$car]['data'][] = [
+                'workOrder' => $workOrder,
+                'actualWorkOrder' => $actualInfo['workOrder'],
+                'machineStatus' => $actualInfo['status'],
+                'machineStatusName' => $actualInfo['statusName'],
+                'machineHistory' => $machineStr,
+                'installDate' => $installDate,
+                'displayDate' => $row['架機日期']
+            ];
+        }
+    }
+}
         
         // 排序每個車台的數據（按照架機日期）
         foreach ($result as &$carData) {
@@ -103,7 +133,7 @@ function getCarData() {
     }
 }
 
-// 獲取實際工單號
+// 獲取實際工單號和狀態
 function getActualWorkOrder($car, $pdo) {
     try {
         // 檢查表是否存在
@@ -112,24 +142,32 @@ function getActualWorkOrder($car, $pdo) {
         
         if ($checkTable->rowCount() == 0) {
             // 如果表不存在，返回空值
-            return null;
+            return ['workOrder' => null, 'status' => null];
         }
         
-        // 查詢車台對應的實際工單
-        $sql = "SELECT 工單號 FROM OProduction_Schedule WHERE 車台號 = ? ORDER BY 更新時間 DESC LIMIT 1";
+        // 查詢車台對應的實際工單和狀態
+        $sql = "SELECT ops.工單號, ops.狀態, ms.status_name 
+                FROM OProduction_Schedule ops 
+                LEFT JOIN OMachine_Status ms ON ops.狀態 = ms.id 
+                WHERE ops.車台號 = ? 
+                ORDER BY ops.更新時間 DESC LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$car]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // 如果有結果，返回工單號，否則返回null
-        return $result ? $result['工單號'] : null;
+        // 如果有結果，返回工單號和狀態，否則返回null
+        return $result ? [
+            'workOrder' => $result['工單號'],
+            'status' => $result['狀態'],
+            'statusName' => $result['status_name']
+        ] : ['workOrder' => null, 'status' => null, 'statusName' => null];
     } catch (PDOException $e) {
         // 出錯時返回null
-        return null;
+        return ['workOrder' => null, 'status' => null, 'statusName' => null];
     }
 }
 
-// 獲取所有工單的函數
+// 獲取所有工單的函數 (原本已經存在，但調整了SQL查詢)
 function getWorkOrders() {
     // 引入數據庫連接配置
     require_once 'config.php';
@@ -142,7 +180,7 @@ function getWorkOrders() {
 
     try {
         // 查詢工單資料
-        $sql = "SELECT 工單號, 品名 FROM uploaded_data WHERE 工單號 IS NOT NULL AND 工單號 <> '' ORDER BY 工單號";
+        $sql = "SELECT 工單號, 品名 FROM uploaded_data WHERE 工單號 IS NOT NULL AND 工單號 <> '' GROUP BY 工單號, 品名 ORDER BY 工單號";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
         $workOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -180,6 +218,7 @@ function saveWorkOrder() {
         $car = $data['car'];
         $workOrder = $data['workOrder'];
         $preWorkOrder = $data['preWorkOrder'] ?? '';
+        $status = $data['status'] ?? 'C'; // 預設為 'C' (待確認)
         
         // 檢查工單是否存在
         $checkSql = "SELECT COUNT(*) AS count FROM uploaded_data WHERE 工單號 = ?";
@@ -198,6 +237,7 @@ function saveWorkOrder() {
             車台號 VARCHAR(10) NOT NULL,
             工單號 VARCHAR(50) NOT NULL,
             預排工單號 VARCHAR(50),
+            狀態 VARCHAR(5) DEFAULT 'C',
             建立時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             更新時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )");
@@ -210,14 +250,14 @@ function saveWorkOrder() {
         
         if ($existingRecord) {
             // 更新現有記錄
-            $updateSql = "UPDATE OProduction_Schedule SET 工單號 = ?, 預排工單號 = ? WHERE 車台號 = ?";
+            $updateSql = "UPDATE OProduction_Schedule SET 工單號 = ?, 預排工單號 = ?, 狀態 = ? WHERE 車台號 = ?";
             $updateStmt = $pdo->prepare($updateSql);
-            $updateStmt->execute([$workOrder, $preWorkOrder, $car]);
+            $updateStmt->execute([$workOrder, $preWorkOrder, $status, $car]);
         } else {
             // 建立新記錄
-            $insertSql = "INSERT INTO OProduction_Schedule (車台號, 工單號, 預排工單號) VALUES (?, ?, ?)";
+            $insertSql = "INSERT INTO OProduction_Schedule (車台號, 工單號, 預排工單號, 狀態) VALUES (?, ?, ?, ?)";
             $insertStmt = $pdo->prepare($insertSql);
-            $insertStmt->execute([$car, $workOrder, $preWorkOrder]);
+            $insertStmt->execute([$car, $workOrder, $preWorkOrder, $status]);
         }
         
         echo json_encode(['success' => true, 'message' => '工單資料儲存成功']);

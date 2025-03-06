@@ -39,6 +39,16 @@ CREATE TABLE uploaded_data (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 新增 OProduction_Schedule 表單，用於儲存車台的實際工單號
+CREATE TABLE IF NOT EXISTS OProduction_Schedule (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        車台號 VARCHAR(10) NOT NULL,
+        工單號 VARCHAR(50) NOT NULL,
+        車台預排 VARCHAR(50),
+        建立時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        更新時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+
     -- 途程號 VARCHAR(20),
     -- 工作中心 VARCHAR(50),
     -- 工作中心說明 TEXT,
@@ -54,6 +64,29 @@ CREATE TABLE uploaded_data (
     -- 入庫天數 INT,
     -- 標準應完成數 INT,
     -- 應完成百分比 DECIMAL(5,2),
+
+USE excel_manager;
+CREATE TABLE OMachine_Status (
+    id VARCHAR(5) PRIMARY KEY,
+    status_name VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 插入預設狀態
+INSERT INTO OMachine_Status (id, status_name) VALUES 
+('1', '正常運轉'),
+('A', '架機(改車)'),
+('B', '待排程'),
+('C', '待確認'),
+('D', '生產(繼續車)日期未到'),
+('E', '待訂單'),
+('0', '零件維修'),
+('F', '委外維修'),
+('G', '待機(繼續車)'),
+('H', '待訂');
+
+-- 在 OProduction_Schedule 表中添加狀態欄位
+ALTER TABLE OProduction_Schedule ADD COLUMN 狀態 VARCHAR(5) DEFAULT 'C' REFERENCES OMachine_Status(id);
 
 USE excel_manager;
 CREATE TABLE products (
