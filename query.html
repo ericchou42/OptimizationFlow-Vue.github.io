@@ -169,10 +169,10 @@
                         <!-- 共用表頭 -->
                         <thead>
                             <tr class="shared-header">
-                                <th>車台</th>
-                                <th>車台狀態</th>
-                                <th>工單號碼</th>
-                                <th>預排工單</th>
+                                <th>機台</th>
+                                <th>狀態</th>
+                                <th>工單號</th>
+                                <th>工單(預)</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -341,17 +341,39 @@ const initializeSelectDropdowns = () => {
     nextTick(() => {
         // 初始化工單下拉選單
         $('.workorder-select').each(function() {
-            $(this).select2({
+            const selectElement = $(this);
+            const carId = selectElement.attr('id').split('-')[1];
+            const item = data.value.find(i => i.car === carId);
+            
+            selectElement.select2({
                 placeholder: '請選擇工單',
                 allowClear: true
+            });
+            
+            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
+            selectElement.on('change', function() {
+                if (item) {
+                    item.currentWorkOrder = selectElement.val();
+                }
             });
         });
         
         // 初始化狀態下拉選單
         $('.status-select').each(function() {
-            $(this).select2({
+            const selectElement = $(this);
+            const carId = selectElement.attr('id').split('-')[2];
+            const item = data.value.find(i => i.car === carId);
+            
+            selectElement.select2({
                 placeholder: '請選擇狀態',
                 allowClear: true
+            });
+            
+            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
+            selectElement.on('change', function() {
+                if (item) {
+                    item.currentStatus = selectElement.val();
+                }
             });
         });
     });

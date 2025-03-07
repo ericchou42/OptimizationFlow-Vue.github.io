@@ -1,8 +1,9 @@
--- 登入紀錄
-CREATE DATABASE excel_manager;
+-- 建立資料庫
+CREATE DATABASE IF NOT EXISTS excel_manager;
 USE excel_manager;
 
-CREATE TABLE users (
+-- 登入紀錄
+CREATE TABLE NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
@@ -10,16 +11,12 @@ CREATE TABLE users (
     -- created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 建立一個使用者名稱為 'admin'，密碼為 'password' 的帳號
 INSERT INTO users (username, password) 
 VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
--- 這會建立一個使用者名稱為 'admin'，密碼為 'password' 的帳號
 
-    -- id INT AUTO_INCREMENT PRIMARY KEY,
-
-CREATE DATABASE excel_manager;
-USE excel_manager;
-
-CREATE TABLE uploaded_data (
+-- 上傳資料
+CREATE TABLE IF NOT EXISTS uploaded_data (
     工單號 VARCHAR(50) NOT NULL PRIMARY KEY,
     料號 VARCHAR(50) NOT NULL,
     品名 TEXT NOT NULL,
@@ -39,8 +36,7 @@ CREATE TABLE uploaded_data (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-USE excel_manager;
-CREATE TABLE 機台狀態 (
+CREATE TABLE IF NOT EXISTS 機台狀態 (
     代碼 VARCHAR(5) PRIMARY KEY,
     狀態 VARCHAR(50) NOT NULL
 );
@@ -58,15 +54,12 @@ INSERT INTO 機台狀態 (代碼, 狀態) VALUES
 ('G', '待機(繼續車)'),
 ('H', '待訂');
 
--- 在 OProduction_Schedule 表中添加狀態欄位
-ALTER TABLE OProduction_Schedule ADD COLUMN 狀態 VARCHAR(5) DEFAULT 'C' REFERENCES OMachine_Status(id);
-
-
 CREATE TABLE IF NOT EXISTS 機台看板 (
     機台 VARCHAR(10) NOT NULL PRIMARY KEY,
     狀態 VARCHAR(5) DEFAULT 'B',
     工單號 VARCHAR(50)
 );
+
 -- 插入預設狀態
 TRUNCATE TABLE 機台看板;
 INSERT INTO 機台看板 (機台) VALUES 
