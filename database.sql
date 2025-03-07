@@ -3,12 +3,10 @@ CREATE DATABASE IF NOT EXISTS excel_manager;
 USE excel_manager;
 
 -- 登入紀錄
-CREATE TABLE NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    name VARCHAR(100) NOT NULL
-    -- created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    password VARCHAR(255) NOT NULL
 );
 
 -- 建立一個使用者名稱為 'admin'，密碼為 'password' 的帳號
@@ -18,9 +16,9 @@ VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi')
 -- 上傳資料
 CREATE TABLE IF NOT EXISTS uploaded_data (
     工單號 VARCHAR(50) NOT NULL PRIMARY KEY,
-    料號 VARCHAR(50) NOT NULL,
+    料號 VARCHAR(50),
     品名 TEXT NOT NULL,
-    交期 VARCHAR(50) NOT NULL,
+    交期 VARCHAR(50),
     工單數 INT,
     實際入庫 INT,
     產速 DECIMAL(10,2),
@@ -32,9 +30,11 @@ CREATE TABLE IF NOT EXISTS uploaded_data (
     利潤中心 VARCHAR(50),
     實際完成 VARCHAR(50),
     落後百分比 DECIMAL(5,2),
-    車製回覆完成日 VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    車製回覆完成日 VARCHAR(50)
+    -- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+INSERT INTO uploaded_data (工單號,品名,`機台(預)`) VALUES ('123','456','A01');
 
 CREATE TABLE IF NOT EXISTS 機台狀態 (
     代碼 VARCHAR(5) PRIMARY KEY,

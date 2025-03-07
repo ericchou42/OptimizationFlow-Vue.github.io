@@ -3,7 +3,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // 關閉錯誤顯示，改為捕獲
 
-$host = "localhost";
+$host = "127.0.0.1";
 $dbname = "excel_manager";
 $username = "root";
 $password = "";
