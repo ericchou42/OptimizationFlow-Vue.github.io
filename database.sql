@@ -39,41 +39,14 @@ CREATE TABLE uploaded_data (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 新增 OProduction_Schedule 表單，用於儲存車台的實際工單號
-CREATE TABLE IF NOT EXISTS OProduction_Schedule (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        車台號 VARCHAR(10) NOT NULL,
-        工單號 VARCHAR(50) NOT NULL,
-        車台預排 VARCHAR(50),
-        建立時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        更新時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );
-
-    -- 途程號 VARCHAR(20),
-    -- 工作中心 VARCHAR(50),
-    -- 工作中心說明 TEXT,
-    -- 在製數 INT,
-    -- 途程實際完工量 INT NOT NULL,
-    -- 途程實際完工工時 DECIMAL(10,2),
-    -- 途程標準完工量 INT,
-    -- 途程標準完工工時 DECIMAL(10,2),
-    -- 途程完工量差異 INT,
-    -- 途程產量差異 INT,
-    -- 標準入庫 INT,
-    -- 入庫日 VARCHAR(50),
-    -- 入庫天數 INT,
-    -- 標準應完成數 INT,
-    -- 應完成百分比 DECIMAL(5,2),
-
 USE excel_manager;
-CREATE TABLE OMachine_Status (
-    id VARCHAR(5) PRIMARY KEY,
-    status_name VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE 機台狀態 (
+    代碼 VARCHAR(5) PRIMARY KEY,
+    狀態 VARCHAR(50) NOT NULL
 );
 
 -- 插入預設狀態
-INSERT INTO OMachine_Status (id, status_name) VALUES 
+INSERT INTO 機台狀態 (代碼, 狀態) VALUES 
 ('1', '正常運轉'),
 ('A', '架機(改車)'),
 ('B', '待排程'),
@@ -88,20 +61,20 @@ INSERT INTO OMachine_Status (id, status_name) VALUES
 -- 在 OProduction_Schedule 表中添加狀態欄位
 ALTER TABLE OProduction_Schedule ADD COLUMN 狀態 VARCHAR(5) DEFAULT 'C' REFERENCES OMachine_Status(id);
 
-USE excel_manager;
-CREATE TABLE products (
-    barcode VARCHAR(50) PRIMARY KEY,
-    product_name VARCHAR(200) NOT NULL,
-    specifications VARCHAR(500)
-);
 
-USE excel_manager;
-CREATE TABLE weight_records (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT,
-    barcode VARCHAR(50),
-    weight DECIMAL(10,2),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (barcode) REFERENCES products(barcode)
+CREATE TABLE IF NOT EXISTS 機台看板 (
+    機台 VARCHAR(10) NOT NULL PRIMARY KEY,
+    狀態 VARCHAR(5) DEFAULT 'B',
+    工單號 VARCHAR(50)
 );
+-- 插入預設狀態
+TRUNCATE TABLE 機台看板;
+INSERT INTO 機台看板 (機台) VALUES 
+('A01'),('A02'),('A03'),('A04'),('A05'),('A06'),('A07'),('A08'),('A09'),('A10'),
+('A11'),('A12'),('A13'),('A14'),('A15'),('A16'),('A17'),('A18'),('A19'),('A20'),
+('A21'),('A22'),('B01'),('B02'),('B03'),('B04'),('B05'),('B06'),('B07'),('B08'),
+('B09'),('B10'),('B11'),('B12'),('B13'),('B14'),('B15'),('C01'),('C02'),('C03'),
+('C04'),('C05'),('C06'),('C07'),('C08'),('C09'),('C10'),('C11'),('C12'),('C13'),
+('C14'),('C15'),('C16'),('C17'),('F01'),('F02'),('F03'),('F04'),('F05'),('F06'),
+('F07'),('F08'),('F09'),('F10'),('F11'),('F12'),('F13'),('F14'),('F15'),('F16');
+

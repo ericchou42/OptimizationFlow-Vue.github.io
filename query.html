@@ -173,46 +173,55 @@
                                 <th>車台狀態</th>
                                 <th>工單號碼</th>
                                 <th>預排工單</th>
-                                <th>架機日期</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             <!-- 資料迴圈顯示 -->
                             <template v-for="(item, index) in filteredData" :key="index">
-                                <!-- 車台資料群組 -->
-                                <template v-if="item.data && item.data.length > 0">
-                                    <tr v-for="(entry, idx) in item.data" :key="`${index}-${idx}`"
-                                        :class="{ 'highlight': isHighlighted(item, entry) }"
-                                        :id="`row-${item.car}-${idx}`">
-                                        <!-- 只在該車台的第一筆資料顯示車台編號，並合併儲存格 -->
-                                    <td v-if="idx === 0" :rowspan="item.data.length" class="car-cell">{{ item.car }}</td>
-                                    <td class="status-cell">
-                                            <select :id="`machine-status-${item.car}-${idx}`" class="form-control status-select">
-                                                <option value="">請選擇狀態</option>
-                                            </select>
-                                    </td>
-                                    <!-- <td class="machine-history-cell wrap-content">{{ entry.machineHistory }}</td> -->
-                                    <td class="workorder-cell wrap-content">
-                                            <div class="d-flex">
-                                                <select :id="`actual-workorder-${item.car}-${idx}`" class="form-control workorder-select">
-                                                    <option value="">請選擇工單</option>
-                                                </select>
-                                            </div>
-                                        </td>
-                                        <td class="workorder-cell wrap-content">{{ entry.workOrder }}</td>
-                                        <td class="date-cell">{{ entry.displayDate }}</td>
-                                        <td class="text-center">
-                                            <button @click="saveWorkOrder(item.car, idx, entry.workOrder)" class="btn btn-sm btn-primary save-btn">
-                                                儲存
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </template>
-                                <!-- 無資料顯示 -->
-                                <tr v-else :class="{ 'highlight': searchTerm && item.car.includes(searchTerm) }">
+                                <tr :id="`row-${item.car}`">
                                     <td class="car-cell">{{ item.car }}</td>
-                                    <td colspan="5" class="no-data">沒有相關資料</td>
+                                    <td class="status-cell">
+                                        <select :id="`machine-status-${item.car}`" 
+                                                class="form-control status-select"
+                                                v-model="item.currentStatus">
+                                            <option v-for="status in machineStatuses" 
+                                                    :key="status.id" 
+                                                    :value="status.id">
+                                                {{ status.id }} - {{ status.status_name }}
+                                            </option>
+                                        </select>
+                                    </td>
+                                    <td class="workorder-cell">
+                                        <select :id="`workorder-${item.car}`" 
+                                                class="form-control workorder-select"
+                                                v-model="item.currentWorkOrder">
+                                            <option value="">請選擇工單</option>
+                                            <option v-for="order in workOrders" 
+                                                    :key="order.工單號" 
+                                                    :value="order.工單號">
+                                                {{ order.工單號 }} - {{ order.品名 }}
+                                            </option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div v-if="item.scheduledOrders && item.scheduledOrders.length">
+                                            <div v-for="(order, idx) in item.scheduledOrders" 
+                                                 :key="idx" 
+                                                 class="scheduled-order">
+                                                {{ order.workOrder }} 
+                                                ({{ order.installDate }})
+                                                - {{ order.productName }}
+                                            </div>
+                                        </div>
+                                        <div v-else>無預排工單</div>
+                                    </td>
+                                    <td>
+                                        <button @click="saveWorkOrder(item.car)" 
+                                                class="btn btn-sm btn-primary">
+                                            儲存
+                                        </button>
+                                    </td>
                                 </tr>
                             </template>
                         </tbody>
@@ -392,58 +401,25 @@ const initializeSelectDropdowns = () => {
 };
                 
 // 儲存工單資料
-const saveWorkOrder = async (car, idx, defaultWorkOrder) => {
-    const workOrderSelectId = `actual-workorder-${car}-${idx}`;
-    const statusSelectId = `machine-status-${car}-${idx}`;
-    const workOrderSelect = document.getElementById(workOrderSelectId);
-    const statusSelect = document.getElementById(statusSelectId);
-    const workOrderValue = workOrderSelect.value || defaultWorkOrder;
-    const statusValue = statusSelect.value || 'C'; // 預設為 'C' (待確認)
-    
-    if (!workOrderValue) {
-        showMessage('請選擇工單號碼', 'alert-warning');
-        return;
-    }
-    
+const saveWorkOrder = async (car) => {
+    const item = data.value.find(i => i.car === car);
+    if (!item) return;
+
     try {
-        const response = await axios.post('./backend/save_work_order.php', {
+        const response = await axios.post('./backend/query.php?action=save_work_order', {
             car: car,
-            workOrder: workOrderValue,
-            preWorkOrder: defaultWorkOrder,
-            status: statusValue
+            status: item.currentStatus,
+            workOrder: item.currentWorkOrder
         });
-        
+
         if (response.data.success) {
+            showMessage('更新成功', 'alert-success');
             // 更新本地數據
-            const carItem = data.value.find(item => item.car === car);
-            if (carItem && carItem.data && carItem.data[idx]) {
-                carItem.data[idx].actualWorkOrder = workOrderValue;
-                carItem.data[idx].machineStatus = statusValue;
-                carItem.data[idx].machineStatusName = machineStatuses.value.find(s => s.id === statusValue)?.status_name;
-            }
-            
-            // 顯示成功訊息
-            showMessage('工單資料儲存成功！', 'alert-success');
-            
-            // 視覺提示：短暫高亮顯示儲存成功的行
-            const rowElement = document.getElementById(`row-${car}-${idx}`);
-            if (rowElement) {
-                rowElement.classList.add('save-success');
-                setTimeout(() => {
-                    rowElement.classList.remove('save-success');
-                }, 2000);
-            }
+            item.currentStatusName = machineStatuses.value.find(
+                s => s.id === item.currentStatus
+            )?.status_name;
         } else {
-            showMessage(`儲存失敗: ${response.data.error}`, 'alert-danger');
-            
-            // 視覺提示：短暫高亮顯示儲存失敗的行
-            const rowElement = document.getElementById(`row-${car}-${idx}`);
-            if (rowElement) {
-                rowElement.classList.add('save-error');
-                setTimeout(() => {
-                    rowElement.classList.remove('save-error');
-                }, 2000);
-            }
+            showMessage(response.data.error, 'alert-danger');
         }
     } catch (err) {
         showMessage(`儲存失敗: ${err.message}`, 'alert-danger');
