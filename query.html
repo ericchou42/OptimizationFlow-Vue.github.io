@@ -321,6 +321,7 @@ const fetchMachineStatuses = async () => {
         error.value = `獲取機台狀態數據失敗: ${err.message}`;
     }
 };
+
 // 獲取工單下拉選單資料
 const fetchWorkOrders = async () => {
     try {
@@ -339,63 +340,19 @@ const fetchWorkOrders = async () => {
 const initializeSelectDropdowns = () => {
     nextTick(() => {
         // 初始化工單下拉選單
-        const workorderSelects = document.querySelectorAll('.workorder-select');
-        workorderSelects.forEach(select => {
-            // 清空現有選項(除了第一個)
-            while (select.options.length > 1) {
-                select.remove(1);
-            }
-            
-            // 添加所有工單選項
-            workOrders.value.forEach(workOrder => {
-                const option = document.createElement('option');
-                option.value = workOrder.工單號;
-                option.textContent = `${workOrder.工單號} - ${workOrder.品名}`;
-                select.appendChild(option);
-            });
-            
-            // 初始化 Select2
-            $(select).select2({
+        $('.workorder-select').each(function() {
+            $(this).select2({
                 placeholder: '請選擇工單',
                 allowClear: true
             });
-
-            // 如果有現有值，則設置
-            const [_, carId, idx] = select.id.split('-').slice(-3);
-            const carItem = data.value.find(item => item.car === carId);
-            if (carItem && carItem.data && carItem.data[idx] && carItem.data[idx].actualWorkOrder) {
-                $(select).val(carItem.data[idx].actualWorkOrder).trigger('change');
-            }
         });
         
         // 初始化狀態下拉選單
-        const statusSelects = document.querySelectorAll('.status-select');
-        statusSelects.forEach(select => {
-            // 清空現有選項(除了第一個)
-            while (select.options.length > 1) {
-                select.remove(1);
-            }
-            
-            // 添加所有狀態選項
-            machineStatuses.value.forEach(status => {
-                const option = document.createElement('option');
-                option.value = status.id;
-                option.textContent = `${status.id} - ${status.status_name}`;
-                select.appendChild(option);
-            });
-            
-            // 初始化 Select2
-            $(select).select2({
+        $('.status-select').each(function() {
+            $(this).select2({
                 placeholder: '請選擇狀態',
                 allowClear: true
             });
-
-            // 如果有現有值，則設置
-            const [_, carId, idx] = select.id.split('-').slice(-3);
-            const carItem = data.value.find(item => item.car === carId);
-            if (carItem && carItem.data && carItem.data[idx] && carItem.data[idx].machineStatus) {
-                $(select).val(carItem.data[idx].machineStatus).trigger('change');
-            }
         });
     });
 };
@@ -467,7 +424,8 @@ return {
     saveWorkOrder,
     message,
     messageType,
-    machineStatuses
+    machineStatuses,
+    workOrders
 };
             }
         });
