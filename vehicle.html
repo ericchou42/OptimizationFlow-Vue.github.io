@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>車台查詢系統</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         /* 基本頁面樣式 */
         body {
@@ -83,7 +84,17 @@
             text-align: center;
             white-space: nowrap; /* 避免日期換行 */
         }
-        
+        /* 狀態欄位樣式 */
+.status-cell {
+    width: 15%;
+    text-align: center;
+}
+
+/* 狀態下拉選單樣式 */
+.status-select {
+    width: 100%;
+    font-size: 0.9rem;
+}
         /* 表格容器設定，允許水平滾動 */
         .table-container {
             width: 100%;
@@ -96,6 +107,30 @@
         .wrap-content {
             white-space: normal;
             word-break: break-word;
+        }
+        
+        /* 下拉選單樣式 */
+        .select2-container {
+            width: 100% !important;
+        }
+        
+        /* 儲存按鈕樣式 */
+        .save-btn {
+            font-size: 0.8rem;
+            padding: 2px 5px;
+            margin-left: 5px;
+        }
+        
+        /* 修改成功樣式 */
+        .save-success {
+            background-color: #d4edda;
+            transition: background-color 0.5s;
+        }
+        
+        /* 修改失敗樣式 */
+        .save-error {
+            background-color: #f8d7da;
+            transition: background-color 0.5s;
         }
     </style>
 </head>
@@ -115,6 +150,11 @@
                 {{ error }}
             </div>
             
+            <!-- 訊息通知 -->
+            <div v-if="message" class="alert" :class="messageType">
+                {{ message }}
+            </div>
+            
             <!-- 主要內容區域 -->
             <div v-if="!loading && !error">
                 <!-- 搜尋欄位 -->
@@ -129,44 +169,59 @@
                         <!-- 共用表頭 -->
                         <thead>
                             <tr class="shared-header">
-                                <th>車台</th>
-                                <th>車台狀態</th>
-                                <th>架機日期</th>
-                                <th>駕機人員</th>
-                                <th>實際工單</th>
+                                <th>機台</th>
+                                <th>狀態</th>
+                                <th>工單號</th>
                                 <th>品名</th>
-                                <th>圖號</th>
-                                <th>規格</th>
-                                <th>材質外徑</th>
-                                <th>材質</th>
-                                <th>產速</th>
-                                <th>只/2.5M</th>
-                                <th>1PCS</th>
-                                <th>支數</th>
-                                <th>刀具</th>
-                                <th>備註</th>
-                                
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             <!-- 資料迴圈顯示 -->
                             <template v-for="(item, index) in filteredData" :key="index">
-                                <!-- 車台資料群組 -->
-                                <template v-if="item.data && item.data.length > 0">
-                                    <tr v-for="(entry, idx) in item.data" :key="`${index}-${idx}`"
-                                        :class="{ 'highlight': isHighlighted(item, entry) }">
-                                        <!-- 只在該車台的第一筆資料顯示車台編號，並合併儲存格 -->
-                                        <td v-if="idx === 0" :rowspan="item.data.length" class="car-cell">{{ item.car }}</td>
-                                        <td class="machine-history-cell wrap-content">{{ entry.machineHistory }}</td>
-                                        <td class="workorder-cell wrap-content">{{ entry.actualWorkOrder }}</td>
-                                        <td class="workorder-cell wrap-content">{{ entry.workOrder }}</td>
-                                        <td class="date-cell">{{ entry.displayDate }}</td>
-                                    </tr>
-                                </template>
-                                <!-- 無資料顯示 -->
-                                <tr v-else :class="{ 'highlight': searchTerm && item.car.includes(searchTerm) }">
+                                <tr :id="`row-${item.car}`">
                                     <td class="car-cell">{{ item.car }}</td>
-                                    <td colspan="4" class="no-data">沒有相關資料</td>
+                                    <td class="status-cell">
+                                        <select :id="`machine-status-${item.car}`" 
+                                                class="form-control status-select"
+                                                v-model="item.currentStatus">
+                                            <option v-for="status in machineStatuses" 
+                                                    :key="status.id" 
+                                                    :value="status.id">
+                                                {{ status.id }} - {{ status.status_name }}
+                                            </option>
+                                        </select>
+                                    </td>
+                                    <td class="workorder-cell">
+                                        <select :id="`workorder-${item.car}`" 
+                                                class="form-control workorder-select"
+                                                v-model="item.currentWorkOrder">
+                                            <option value="">請選擇工單</option>
+                                            <option v-for="order in workOrders" 
+                                                    :key="order.工單號" 
+                                                    :value="order.工單號">
+                                                {{ order.工單號 }} - {{ order.品名 }}
+                                            </option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div v-if="item.scheduledOrders && item.scheduledOrders.length">
+                                            <div v-for="(order, idx) in item.scheduledOrders" 
+                                                 :key="idx" 
+                                                 class="scheduled-order">
+                                                {{ order.workOrder }} 
+                                                ({{ order.installDate }})
+                                                - {{ order.productName }}
+                                            </div>
+                                        </div>
+                                        <div v-else>無預排工單</div>
+                                    </td>
+                                    <td>
+                                        <button @click="saveWorkOrder(item.car)" 
+                                                class="btn btn-sm btn-primary">
+                                            儲存
+                                        </button>
+                                    </td>
                                 </tr>
                             </template>
                         </tbody>
@@ -178,16 +233,22 @@
     
     <script src="https://cdn.jsdelivr.net/npm/vue@3.2.20/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
         const app = createApp({
             setup() {
                 // 狀態變數
                 const data = ref([]);
-                const loading = ref(true);
-                const error = ref(null);
-                const searchTerm = ref('');
+const loading = ref(true);
+const error = ref(null);
+const searchTerm = ref('');
+const workOrders = ref([]);
+const machineStatuses = ref([]);
+const message = ref('');
+const messageType = ref('');
                 
                 // 搜尋過濾功能
                 const filteredData = computed(() => {
@@ -227,7 +288,7 @@
                 const fetchData = async () => {
                     try {
                         loading.value = true;
-                        const response = await axios.get('./backend/query.php');
+                        const response = await axios.get('./backend/vehicle.php');
                         
                         if (response.data.error) {
                             error.value = response.data.error;
@@ -237,6 +298,7 @@
                             // 在數據加載後，添加延遲以確保表格已渲染
                             setTimeout(() => {
                                 adjustTableColumns();
+                                initializeSelectDropdowns();
                             }, 100);
                         }
                     } catch (err) {
@@ -244,6 +306,115 @@
                     } finally {
                         loading.value = false;
                     }
+                };
+
+// 獲取機台狀態下拉選單資料
+const fetchMachineStatuses = async () => {
+    try {
+        const response = await axios.get('./backend/vehicle.php?action=get_machine_status');
+        if (response.data.error) {
+            error.value = response.data.error;
+        } else {
+            machineStatuses.value = response.data;
+        }
+    } catch (err) {
+        error.value = `獲取機台狀態數據失敗: ${err.message}`;
+    }
+};
+
+// 獲取工單下拉選單資料
+const fetchWorkOrders = async () => {
+    try {
+        const response = await axios.get('./backend/vehicle.php?action=get_work_orders');
+        if (response.data.error) {
+            error.value = response.data.error;
+        } else {
+            workOrders.value = response.data;
+        }
+    } catch (err) {
+        error.value = `獲取工單數據失敗: ${err.message}`;
+    }
+};
+                
+// 初始化下拉選單
+const initializeSelectDropdowns = () => {
+    nextTick(() => {
+        // 初始化工單下拉選單
+        $('.workorder-select').each(function() {
+            const selectElement = $(this);
+            const carId = selectElement.attr('id').split('-')[1];
+            const item = data.value.find(i => i.car === carId);
+            
+            selectElement.select2({
+                placeholder: '請選擇工單',
+                allowClear: true
+            });
+            
+            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
+            selectElement.on('change', function() {
+                if (item) {
+                    item.currentWorkOrder = selectElement.val();
+                }
+            });
+        });
+        
+        // 初始化狀態下拉選單
+        $('.status-select').each(function() {
+            const selectElement = $(this);
+            const carId = selectElement.attr('id').split('-')[2];
+            const item = data.value.find(i => i.car === carId);
+            
+            selectElement.select2({
+                placeholder: '請選擇狀態',
+                allowClear: true
+            });
+            
+            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
+            selectElement.on('change', function() {
+                if (item) {
+                    item.currentStatus = selectElement.val();
+                }
+            });
+        });
+    });
+};
+                
+// 儲存工單資料
+const saveWorkOrder = async (car) => {
+    const item = data.value.find(i => i.car === car);
+    if (!item) return;
+
+    try {
+        const response = await axios.post('./backend/vehicle.php?action=save_work_order', {
+            car: car,
+            status: item.currentStatus,
+            workOrder: item.currentWorkOrder
+        });
+
+        if (response.data.success) {
+            showMessage('更新成功', 'alert-success');
+            // 更新本地數據
+            item.currentStatusName = machineStatuses.value.find(
+                s => s.id === item.currentStatus
+            )?.status_name;
+        } else {
+            showMessage(response.data.error, 'alert-danger');
+        }
+    } catch (err) {
+        showMessage(`儲存失敗: ${err.message}`, 'alert-danger');
+    }
+};
+                
+                // 顯示訊息
+                const showMessage = (msg, type) => {
+                    message.value = msg;
+                    messageType.value = type;
+                    
+                    // 3秒後自動清除訊息
+                    setTimeout(() => {
+                        message.value = '';
+                        messageType.value = '';
+                    }, 3000);
                 };
                 
                 // 調整表格列寬以適應內容
@@ -253,22 +424,31 @@
                     // 注意：表格已經通過CSS的table-layout: auto實現了大部分自動調整
                 };
                 
-                // 頁面載入時獲取數據
-                onMounted(() => {
-                    fetchData();
-                    
-                    // 添加窗口大小變化監聽器，以便在瀏覽器大小改變時重新調整表格
-                    window.addEventListener('resize', adjustTableColumns);
-                });
-                
-                return {
-                    data,
-                    loading,
-                    error,
-                    searchTerm,
-                    filteredData,
-                    isHighlighted
-                };
+// 頁面載入時獲取數據
+onMounted(() => {
+    fetchMachineStatuses().then(() => {
+        fetchWorkOrders().then(() => {
+            fetchData();
+        });
+    });
+    
+    // 添加窗口大小變化監聽器，以便在瀏覽器大小改變時重新調整表格
+    window.addEventListener('resize', adjustTableColumns);
+});
+
+return {
+    data,
+    loading,
+    error,
+    searchTerm,
+    filteredData,
+    isHighlighted,
+    saveWorkOrder,
+    message,
+    messageType,
+    machineStatuses,
+    workOrders
+};
             }
         });
 
