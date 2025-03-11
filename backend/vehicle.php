@@ -96,7 +96,7 @@ function getCarData() {
             
             $result[$carId] = [
                 'car' => $carId,
-                'currentStatus' => $dashboard['狀態'] ?: 'B', // 預設狀態為 'B'
+                'currentStatus' => $dashboard['狀態'] ?: 'B',
                 'currentWorkOrder' => $workOrderId,
                 'productName' => $productName,
                 'drawingInfo' => $drawingInfo,

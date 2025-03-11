@@ -159,7 +159,7 @@
             <div v-if="!loading && !error">
                 <!-- 搜尋欄位 -->
                 <div class="mb-3">
-                    <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋車台或工單號...">
+                    <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋機台狀態代碼">
                 </div>
                 
                 <!-- 表格區域，使用容器允許水平滾動 -->
@@ -188,14 +188,14 @@
                                     <td class="car-cell">{{ item.car }}</td>
                                     <td class="status-cell">
                                         <select :id="`machine-status-${item.car}`" 
-                                                class="form-control status-select"
-                                                v-model="item.currentStatus">
-                                            <option v-for="status in machineStatuses" 
-                                                    :key="status.id" 
-                                                    :value="status.id">
-                                                {{ status.id }} - {{ status.status_name }}
-                                            </option>
-                                        </select>
+                                        class="form-control"
+                                        v-model="item.currentStatus">
+                                    <option v-for="status in machineStatuses" 
+                                            :key="status.id" 
+                                            :value="status.id">
+                                        {{ status.id }} - {{ status.status_name }}
+                                    </option>
+                                </select>
                                     </td>
                                     <td class="workorder-cell">{{ item.currentWorkOrder }}</td>
                                     <td>{{ item.productName }}</td>
@@ -255,8 +255,7 @@ const filteredData = computed(() => {
         // if (item.productName && item.productName.toLowerCase().includes(term)) return true;
         
         // 檢查狀態代碼
-        if (item.currentStatus && item.currentStatus.toLowerCase().includes(term)) return true;
-        
+        if (item.currentStatus && item.currentStatus.toLowerCase().includes(term)) return true;    
         return false;
     });
 });
@@ -272,29 +271,34 @@ const filteredData = computed(() => {
                            (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
                 };
                 
-                // 從後端獲取數據並在加載後調整表格尺寸
                 const fetchData = async () => {
-                    try {
-                        loading.value = true;
-                        const response = await axios.get('./backend/vehicle.php');
-                        
-                        if (response.data.error) {
-                            error.value = response.data.error;
-                        } else {
-                            data.value = response.data;
-                            
-                            // 在數據加載後，添加延遲以確保表格已渲染
-                            setTimeout(() => {
-                                adjustTableColumns();
-                                initializeSelectDropdowns();
-                            }, 100);
-                        }
-                    } catch (err) {
-                        error.value = `獲取數據失敗: ${err.message}`;
-                    } finally {
-                        loading.value = false;
-                    }
+    try {
+        loading.value = true;
+        const response = await axios.get('./backend/vehicle.php');
+        
+        if (response.data.error) {
+            error.value = response.data.error;
+        } else {
+            // 確保每個項目都有正確的 currentStatus
+            data.value = response.data.map(item => {
+                return {
+                    ...item,
+                    currentStatus: item.currentStatus || 'B' // 如果後端沒有提供，則使用默認值
                 };
+            });
+            
+            // 在數據加載後，添加延遲以確保表格已渲染
+            setTimeout(() => {
+                adjustTableColumns();
+                initializeSelectDropdowns();
+            }, 100);
+        }
+    } catch (err) {
+        error.value = `獲取數據失敗: ${err.message}`;
+    } finally {
+        loading.value = false;
+    }
+};
 
 // 獲取機台狀態下拉選單資料
 const fetchMachineStatuses = async () => {
@@ -324,7 +328,6 @@ const fetchWorkOrders = async () => {
     }
 };
                 
-// 初始化下拉選單，只保留狀態選單
 const initializeSelectDropdowns = () => {
     nextTick(() => {
         // 初始化狀態下拉選單
@@ -333,10 +336,21 @@ const initializeSelectDropdowns = () => {
             const carId = selectElement.attr('id').split('-')[2];
             const item = data.value.find(i => i.car === carId);
             
+            // 銷毀之前的 Select2 實例（避免重複初始化）
+            if ($(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2('destroy');
+            }
+            
+            // 重新初始化 Select2
             selectElement.select2({
                 placeholder: '請選擇狀態',
                 allowClear: true
             });
+            
+            // 確保選擇正確的值
+            if (item && item.currentStatus) {
+                selectElement.val(item.currentStatus).trigger('change');
+            }
             
             // 確保 Select2 的變更能夠同步到 Vue 的資料模型
             selectElement.on('change', function() {
