@@ -37,7 +37,7 @@ def print_zebra_label(data):
         # 定義標籤參數
         # XY軸位置
         x_position = 50
-        x_position_right = 550
+        x_position_right = 600
         y_position = 50
         # 條碼高度和模組寬度
         barcode_height = 100
@@ -56,59 +56,54 @@ def print_zebra_label(data):
         # 添加工單號條碼尺寸
         zpl_command += f"^BY{module_width}"
 
-        # 入庫日期
-        zpl_command += f"^FO{x_position},{y_position}"
+        # 設定 Code 128 條碼參數
+        zpl_command += f"^BCN,{barcode_height},Y,N,N"
+        zpl_command += f"^FD{data['工單號']}-{data['機台']}-01^FS" #工單號-機台-箱數
+        
+        # 日期
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 80}"
         zpl_command += "^A0N,50,50"
         zpl_command += f"^FDDate:3/11^FS"
 
+        # 工單號
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 160}"
+        zpl_command += "^A0N,50,50"
+        zpl_command += f"^FDWorkNumber:{data['工單號']}^FS"
+
         # 品名
         zpl_command += "^CI0,14,15,28" # 使用 Big5 編碼 (台灣繁體中文)
-        zpl_command += f"^FO{x_position},{y_position + 100}"
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 240}"
         zpl_command += "^A0N,50,50"
         zpl_command += f"^FDProductName:081-5052-1^FS"
 
-        # 料號
-        zpl_command += f"^FO{x_position},{y_position + 200}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDPartNumber:41A011706A0M^FS"
-
-        # 備註 車台
-        zpl_command += f"^FO{x_position},{y_position + 300}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDChassis: {data['機台']}^FS"
 
         # 人員
-        zpl_command += f"^FO{x_position},{y_position + 400}"
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 320}"
         zpl_command += "^A0N,50,50"
         zpl_command += f"^FDPersonne:Peter^FS"
 
-        # 後續單位
-        zpl_command += f"^FO{x_position},{y_position + 500}"
+        # 工序
+        zpl_command += f"^FO{300},{y_position + barcode_height + 80}"
         zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDNextUnit:Electroplating^FS"
+        zpl_command += f"^FDProcess:10^FS"
 
-        # 數量
-        zpl_command += f"^FO{x_position_right},{y_position + 300}"
+        # 車台
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 80}"
         zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDQuantity:2074^FS"
+        zpl_command += f"^FDChassis: {data['機台']}^FS"
 
-        # 淨重
-        zpl_command += f"^FO{x_position_right},{y_position + 400}"
+
+        # 箱數
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 160}"
         zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDNetWeight:2.42^FS"
+        zpl_command += f"^FDBox:1^FS"
 
-        # 異常品
-        zpl_command += f"^FO{x_position_right},{y_position + 500}"
+        # 班別
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 320}"
         zpl_command += "^A0N,50,50"
-        zpl_command += f"^FD[Abnormal]^FS"
+        zpl_command += f"^FDShift:night^FS"
 
-        # HSF
-        zpl_command += f"^FO{780},{y_position + 500}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FD[HSF]^FS"
-
-        # 結束ZPL命令
-        zpl_command += "^XZ"  
+        zpl_command += "^XZ"  # 結束ZPL命令
         
         # 使用網路打印可能解決這個問題
         printer_ip = "172.29.123.150"
