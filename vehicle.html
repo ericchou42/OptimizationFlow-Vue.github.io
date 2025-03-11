@@ -173,6 +173,11 @@
                                 <th>狀態</th>
                                 <th>工單號</th>
                                 <th>品名</th>
+                                <th>圖號</th>
+                                <th>規格</th>
+                                <th>材料外徑</th>
+                                <th>材質</th>
+                                <th>只_2_5M</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -192,30 +197,13 @@
                                             </option>
                                         </select>
                                     </td>
-                                    <td class="workorder-cell">
-                                        <select :id="`workorder-${item.car}`" 
-                                                class="form-control workorder-select"
-                                                v-model="item.currentWorkOrder">
-                                            <option value="">請選擇工單</option>
-                                            <option v-for="order in workOrders" 
-                                                    :key="order.工單號" 
-                                                    :value="order.工單號">
-                                                {{ order.工單號 }} - {{ order.品名 }}
-                                            </option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <div v-if="item.scheduledOrders && item.scheduledOrders.length">
-                                            <div v-for="(order, idx) in item.scheduledOrders" 
-                                                 :key="idx" 
-                                                 class="scheduled-order">
-                                                {{ order.workOrder }} 
-                                                ({{ order.installDate }})
-                                                - {{ order.productName }}
-                                            </div>
-                                        </div>
-                                        <div v-else>無預排工單</div>
-                                    </td>
+                                    <td class="workorder-cell">{{ item.currentWorkOrder }}</td>
+                                    <td>{{ item.productName }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.圖號 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.規格 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.材料外徑 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.材質 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.只_2_5M : '' }}</td>
                                     <td>
                                         <button @click="saveWorkOrder(item.car)" 
                                                 class="btn btn-sm btn-primary">
@@ -250,28 +238,28 @@ const machineStatuses = ref([]);
 const message = ref('');
 const messageType = ref('');
                 
-                // 搜尋過濾功能
-                const filteredData = computed(() => {
-                    if (!searchTerm.value) return data.value;
-                    
-                    const term = searchTerm.value.toLowerCase();
-                    
-                    return data.value.filter(item => {
-                        // 檢查車台
-                        if (item.car.toLowerCase().includes(term)) return true;
-                        
-                        // 檢查工單與機台資訊
-                        if (item.data && item.data.length > 0) {
-                            return item.data.some(entry => 
-                                (entry.workOrder && entry.workOrder.toLowerCase().includes(term)) ||
-                                (entry.actualWorkOrder && entry.actualWorkOrder.toLowerCase().includes(term)) ||
-                                (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term))
-                            );
-                        }
-                        
-                        return false;
-                    });
-                });
+// 搜尋過濾功能
+const filteredData = computed(() => {
+    if (!searchTerm.value) return data.value;
+    
+    const term = searchTerm.value.toLowerCase();
+    
+    return data.value.filter(item => {
+        // // 檢查車台
+        // if (item.car.toLowerCase().includes(term)) return true;
+        
+        // // 檢查工單號
+        // if (item.currentWorkOrder && item.currentWorkOrder.toLowerCase().includes(term)) return true;
+        
+        // // 檢查品名
+        // if (item.productName && item.productName.toLowerCase().includes(term)) return true;
+        
+        // 檢查狀態代碼
+        if (item.currentStatus && item.currentStatus.toLowerCase().includes(term)) return true;
+        
+        return false;
+    });
+});
                 
                 // 判斷是否需要高亮顯示
                 const isHighlighted = (item, entry) => {
@@ -336,28 +324,9 @@ const fetchWorkOrders = async () => {
     }
 };
                 
-// 初始化下拉選單
+// 初始化下拉選單，只保留狀態選單
 const initializeSelectDropdowns = () => {
     nextTick(() => {
-        // 初始化工單下拉選單
-        $('.workorder-select').each(function() {
-            const selectElement = $(this);
-            const carId = selectElement.attr('id').split('-')[1];
-            const item = data.value.find(i => i.car === carId);
-            
-            selectElement.select2({
-                placeholder: '請選擇工單',
-                allowClear: true
-            });
-            
-            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
-            selectElement.on('change', function() {
-                if (item) {
-                    item.currentWorkOrder = selectElement.val();
-                }
-            });
-        });
-        
         // 初始化狀態下拉選單
         $('.status-select').each(function() {
             const selectElement = $(this);
@@ -427,9 +396,7 @@ const saveWorkOrder = async (car) => {
 // 頁面載入時獲取數據
 onMounted(() => {
     fetchMachineStatuses().then(() => {
-        fetchWorkOrders().then(() => {
-            fetchData();
-        });
+        fetchData();
     });
     
     // 添加窗口大小變化監聽器，以便在瀏覽器大小改變時重新調整表格

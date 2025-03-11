@@ -34,7 +34,7 @@ function getMachineStatus() {
     }
 }
 
-// 獲取車台資料的函數
+// 從第48行開始修改 getCarData() 函數
 function getCarData() {
     require_once 'config.php';
     header('Content-Type: application/json');
@@ -60,14 +60,46 @@ function getCarData() {
         $stmt->execute();
         $scheduledData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // 3. 獲取工單和品名對應信息
+        $sql = "SELECT 工單號, 品名 FROM uploaded_data WHERE 工單號 IS NOT NULL";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $workOrderData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $workOrderMap = [];
+        foreach ($workOrderData as $wo) {
+            $workOrderMap[$wo['工單號']] = $wo['品名'];
+        }
+
+        // 4. 獲取圖號表信息
+        $sql = "SELECT 品名, 圖號, 規格, 材料外徑, 材質, 只_2_5M FROM 圖號表";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $drawingData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $drawingMap = [];
+        foreach ($drawingData as $drawing) {
+            $drawingMap[$drawing['品名']] = [
+                '圖號' => $drawing['圖號'],
+                '規格' => $drawing['規格'],
+                '材料外徑' => $drawing['材料外徑'],
+                '材質' => $drawing['材質'],
+                '只_2_5M' => $drawing['只_2_5M']
+            ];
+        }
+
         // 整理數據結構
         $result = [];
         foreach ($dashboardData as $dashboard) {
             $carId = $dashboard['車台號'];
+            $workOrderId = $dashboard['工單號'];
+            $productName = isset($workOrderMap[$workOrderId]) ? $workOrderMap[$workOrderId] : "";
+            $drawingInfo = isset($drawingMap[$productName]) ? $drawingMap[$productName] : null;
+            
             $result[$carId] = [
                 'car' => $carId,
                 'currentStatus' => $dashboard['狀態'] ?: 'B', // 預設狀態為 'B'
-                'currentWorkOrder' => $dashboard['工單號'],
+                'currentWorkOrder' => $workOrderId,
+                'productName' => $productName,
+                'drawingInfo' => $drawingInfo,
                 'scheduledOrders' => []
             ];
         }
