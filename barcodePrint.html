@@ -159,7 +159,7 @@
             <div v-if="!loading && !error">
                 <!-- 搜尋欄位 -->
                 <div class="mb-3">
-                    <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋車台或工單號...">
+                    <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋機台狀態代碼">
                 </div>
                 
                 <!-- 表格區域，使用容器允許水平滾動 -->
@@ -172,7 +172,12 @@
                                 <th>機台</th>
                                 <th>狀態</th>
                                 <th>工單號</th>
-                                <th>工單(預)</th>
+                                <th>品名</th>
+                                <th>圖號</th>
+                                <th>規格</th>
+                                <th>材料外徑</th>
+                                <th>材質</th>
+                                <th>只_2_5M</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -183,39 +188,22 @@
                                     <td class="car-cell">{{ item.car }}</td>
                                     <td class="status-cell">
                                         <select :id="`machine-status-${item.car}`" 
-                                                class="form-control status-select"
-                                                v-model="item.currentStatus">
-                                            <option v-for="status in machineStatuses" 
-                                                    :key="status.id" 
-                                                    :value="status.id">
-                                                {{ status.id }} - {{ status.status_name }}
-                                            </option>
-                                        </select>
+                                        class="form-control"
+                                        v-model="item.currentStatus">
+                                    <option v-for="status in machineStatuses" 
+                                            :key="status.id" 
+                                            :value="status.id">
+                                        {{ status.id }} - {{ status.status_name }}
+                                    </option>
+                                </select>
                                     </td>
-                                    <td class="workorder-cell">
-                                        <select :id="`workorder-${item.car}`" 
-                                                class="form-control workorder-select"
-                                                v-model="item.currentWorkOrder">
-                                            <option value="">請選擇工單</option>
-                                            <option v-for="order in workOrders" 
-                                                    :key="order.工單號" 
-                                                    :value="order.工單號">
-                                                {{ order.工單號 }} - {{ order.品名 }}
-                                            </option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <div v-if="item.scheduledOrders && item.scheduledOrders.length">
-                                            <div v-for="(order, idx) in item.scheduledOrders" 
-                                                 :key="idx" 
-                                                 class="scheduled-order">
-                                                {{ order.workOrder }} 
-                                                ({{ order.installDate }})
-                                                - {{ order.productName }}
-                                            </div>
-                                        </div>
-                                        <div v-else>無預排工單</div>
-                                    </td>
+                                    <td class="workorder-cell">{{ item.currentWorkOrder }}</td>
+                                    <td>{{ item.productName }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.圖號 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.規格 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.材料外徑 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.材質 : '' }}</td>
+                                    <td>{{ item.drawingInfo ? item.drawingInfo.只_2_5M : '' }}</td>
                                     <td>
                                         <button @click="saveWorkOrder(item.car)" 
                                                 class="btn btn-sm btn-primary">
@@ -250,28 +238,27 @@ const machineStatuses = ref([]);
 const message = ref('');
 const messageType = ref('');
                 
-                // 搜尋過濾功能
-                const filteredData = computed(() => {
-                    if (!searchTerm.value) return data.value;
-                    
-                    const term = searchTerm.value.toLowerCase();
-                    
-                    return data.value.filter(item => {
-                        // 檢查車台
-                        if (item.car.toLowerCase().includes(term)) return true;
-                        
-                        // 檢查工單與機台資訊
-                        if (item.data && item.data.length > 0) {
-                            return item.data.some(entry => 
-                                (entry.workOrder && entry.workOrder.toLowerCase().includes(term)) ||
-                                (entry.actualWorkOrder && entry.actualWorkOrder.toLowerCase().includes(term)) ||
-                                (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term))
-                            );
-                        }
-                        
-                        return false;
-                    });
-                });
+// 搜尋過濾功能
+const filteredData = computed(() => {
+    if (!searchTerm.value) return data.value;
+    
+    const term = searchTerm.value.toLowerCase();
+    
+    return data.value.filter(item => {
+        // // 檢查車台
+        // if (item.car.toLowerCase().includes(term)) return true;
+        
+        // // 檢查工單號
+        // if (item.currentWorkOrder && item.currentWorkOrder.toLowerCase().includes(term)) return true;
+        
+        // // 檢查品名
+        // if (item.productName && item.productName.toLowerCase().includes(term)) return true;
+        
+        // 檢查狀態代碼
+        if (item.currentStatus && item.currentStatus.toLowerCase().includes(term)) return true;    
+        return false;
+    });
+});
                 
                 // 判斷是否需要高亮顯示
                 const isHighlighted = (item, entry) => {
@@ -284,34 +271,39 @@ const messageType = ref('');
                            (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
                 };
                 
-                // 從後端獲取數據並在加載後調整表格尺寸
                 const fetchData = async () => {
-                    try {
-                        loading.value = true;
-                        const response = await axios.get('./backend/query.php');
-                        
-                        if (response.data.error) {
-                            error.value = response.data.error;
-                        } else {
-                            data.value = response.data;
-                            
-                            // 在數據加載後，添加延遲以確保表格已渲染
-                            setTimeout(() => {
-                                adjustTableColumns();
-                                initializeSelectDropdowns();
-                            }, 100);
-                        }
-                    } catch (err) {
-                        error.value = `獲取數據失敗: ${err.message}`;
-                    } finally {
-                        loading.value = false;
-                    }
+    try {
+        loading.value = true;
+        const response = await axios.get('./backend/vehicle.php');
+        
+        if (response.data.error) {
+            error.value = response.data.error;
+        } else {
+            // 確保每個項目都有正確的 currentStatus
+            data.value = response.data.map(item => {
+                return {
+                    ...item,
+                    currentStatus: item.currentStatus || 'B' // 如果後端沒有提供，則使用默認值
                 };
+            });
+            
+            // 在數據加載後，添加延遲以確保表格已渲染
+            setTimeout(() => {
+                adjustTableColumns();
+                initializeSelectDropdowns();
+            }, 100);
+        }
+    } catch (err) {
+        error.value = `獲取數據失敗: ${err.message}`;
+    } finally {
+        loading.value = false;
+    }
+};
 
 // 獲取機台狀態下拉選單資料
 const fetchMachineStatuses = async () => {
     try {
-        const response = await axios.get('./backend/query.php?action=get_machine_status');
+        const response = await axios.get('./backend/vehicle.php?action=get_machine_status');
         if (response.data.error) {
             error.value = response.data.error;
         } else {
@@ -325,7 +317,7 @@ const fetchMachineStatuses = async () => {
 // 獲取工單下拉選單資料
 const fetchWorkOrders = async () => {
     try {
-        const response = await axios.get('./backend/query.php?action=get_work_orders');
+        const response = await axios.get('./backend/vehicle.php?action=get_work_orders');
         if (response.data.error) {
             error.value = response.data.error;
         } else {
@@ -336,38 +328,29 @@ const fetchWorkOrders = async () => {
     }
 };
                 
-// 初始化下拉選單
 const initializeSelectDropdowns = () => {
     nextTick(() => {
-        // 初始化工單下拉選單
-        $('.workorder-select').each(function() {
-            const selectElement = $(this);
-            const carId = selectElement.attr('id').split('-')[1];
-            const item = data.value.find(i => i.car === carId);
-            
-            selectElement.select2({
-                placeholder: '請選擇工單',
-                allowClear: true
-            });
-            
-            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
-            selectElement.on('change', function() {
-                if (item) {
-                    item.currentWorkOrder = selectElement.val();
-                }
-            });
-        });
-        
         // 初始化狀態下拉選單
         $('.status-select').each(function() {
             const selectElement = $(this);
             const carId = selectElement.attr('id').split('-')[2];
             const item = data.value.find(i => i.car === carId);
             
+            // 銷毀之前的 Select2 實例（避免重複初始化）
+            if ($(this).hasClass('select2-hidden-accessible')) {
+                $(this).select2('destroy');
+            }
+            
+            // 重新初始化 Select2
             selectElement.select2({
                 placeholder: '請選擇狀態',
                 allowClear: true
             });
+            
+            // 確保選擇正確的值
+            if (item && item.currentStatus) {
+                selectElement.val(item.currentStatus).trigger('change');
+            }
             
             // 確保 Select2 的變更能夠同步到 Vue 的資料模型
             selectElement.on('change', function() {
@@ -385,7 +368,7 @@ const saveWorkOrder = async (car) => {
     if (!item) return;
 
     try {
-        const response = await axios.post('./backend/query.php?action=save_work_order', {
+        const response = await axios.post('./backend/vehicle.php?action=save_work_order', {
             car: car,
             status: item.currentStatus,
             workOrder: item.currentWorkOrder
@@ -427,9 +410,7 @@ const saveWorkOrder = async (car) => {
 // 頁面載入時獲取數據
 onMounted(() => {
     fetchMachineStatuses().then(() => {
-        fetchWorkOrders().then(() => {
-            fetchData();
-        });
+        fetchData();
     });
     
     // 添加窗口大小變化監聽器，以便在瀏覽器大小改變時重新調整表格
