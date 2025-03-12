@@ -36,18 +36,17 @@ def print_zebra_label(data):
     try:
         # 定義標籤參數
         # XY軸位置
-        x_position = 50
-        x_position_right = 550
-        y_position = 50
-        # 條碼高度和模組寬度
-        barcode_height = 100
+        x_position = 30
+        x_position_right = 630
+        y_position = 30
+
         # 條碼模組寬度(1-10)，數字越大條碼越寬
         module_width = 6
         
         # 準備ZPL命令 - 使用英文標籤避免編碼問題
         zpl_command = "^XA"  # 開始ZPL命令
 
-        # 設定中文碼頁
+        # # 設定中文碼頁
         zpl_command += "^CI28" # 使用 Big5 編碼 (台灣繁體中文)
         
         # 設定條碼起始位置
@@ -58,53 +57,52 @@ def print_zebra_label(data):
 
         # 入庫日期
         zpl_command += f"^FO{x_position},{y_position}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDDate:3/11^FS"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD日期:3/11^FS"
 
         # 品名
-        zpl_command += "^CI0,14,15,28" # 使用 Big5 編碼 (台灣繁體中文)
         zpl_command += f"^FO{x_position},{y_position + 100}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDProductName:081-5052-1^FS"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD品名:081-5052-1^FS"
 
         # 料號
         zpl_command += f"^FO{x_position},{y_position + 200}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDPartNumber:41A011706A0M^FS"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD料號:41A011706A0M^FS"
 
         # 備註 車台
         zpl_command += f"^FO{x_position},{y_position + 300}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDChassis: {data['機台']}^FS"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD機台: {data['機台']}^FS"
 
         # 人員
         zpl_command += f"^FO{x_position},{y_position + 400}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDPersonne:Peter^FS"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD人員:王小明^FS"
 
         # 後續單位
         zpl_command += f"^FO{x_position},{y_position + 500}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDNextUnit:Electroplating^FS"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD後續單位:電^FS"
 
         # 數量
-        zpl_command += f"^FO{x_position_right},{y_position + 300}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDQuantity:2074^FS"
+        zpl_command += f"^FO{x_position_right},{y_position + 100}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD數量:2074^FS"
 
         # 淨重
-        zpl_command += f"^FO{x_position_right},{y_position + 400}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDNetWeight:2.42^FS"
+        zpl_command += f"^FO{x_position_right},{y_position + 200}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD淨重:2.42^FS"
 
         # 異常品
-        zpl_command += f"^FO{x_position_right},{y_position + 500}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FD[Abnormal]^FS"
+        zpl_command += f"^FO{x_position_right},{y_position + 300}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD[異常品]^FS"
 
         # HSF
-        zpl_command += f"^FO{780},{y_position + 500}"
-        zpl_command += "^A0N,50,50"
+        zpl_command += f"^FO{x_position_right},{y_position + 400}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD[HSF]^FS"
 
         # 結束ZPL命令

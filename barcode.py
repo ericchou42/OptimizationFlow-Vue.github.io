@@ -36,13 +36,15 @@ def print_zebra_label(data):
     try:
         # 定義標籤參數
         # XY軸位置
-        x_position = 50
+        x_position = 60
         x_position_right = 600
         y_position = 50
+
         # 條碼高度和模組寬度
         barcode_height = 100
-        # 條碼模組寬度(1-10)，數字越大條碼越寬
-        module_width = 6
+
+        # 條碼模組寬度(1-10)，數字越大條碼越寬，超過5可能會過版
+        module_width = 5
         
         # 準備ZPL命令 - 使用英文標籤避免編碼問題
         zpl_command = "^XA"  # 開始ZPL命令
@@ -58,50 +60,47 @@ def print_zebra_label(data):
 
         # 設定 Code 128 條碼參數
         zpl_command += f"^BCN,{barcode_height},Y,N,N"
-        zpl_command += f"^FD{data['工單號']}-{data['機台']}-01^FS" #工單號-機台-箱數
+        zpl_command += f"^FD{data['工單號']}{data['機台']}01^FS" #工單號-機台-箱數
         
         # 日期
-        zpl_command += f"^FO{x_position},{y_position + barcode_height + 80}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDDate:3/11^FS"
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 100}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD日期:3/11^FS"
 
         # 工單號
-        zpl_command += f"^FO{x_position},{y_position + barcode_height + 160}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDWorkNumber:{data['工單號']}^FS"
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 200}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD工單號:{data['工單號']}^FS"
 
         # 品名
-        zpl_command += "^CI0,14,15,28" # 使用 Big5 編碼 (台灣繁體中文)
-        zpl_command += f"^FO{x_position},{y_position + barcode_height + 240}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDProductName:081-5052-1^FS"
-
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 300}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD品名:081-5052-1^FS"
 
         # 人員
-        zpl_command += f"^FO{x_position},{y_position + barcode_height + 320}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDPersonne:Peter^FS"
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 400}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD顧車:王小明^FS"
 
         # 工序
-        zpl_command += f"^FO{300},{y_position + barcode_height + 80}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDProcess:10^FS"
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 100}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD工序:10^FS"
 
-        # 車台
-        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 80}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDChassis: {data['機台']}^FS"
-
+        # 機台
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 200}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD機台: {data['機台']}^FS"
 
         # 箱數
-        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 160}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDBox:1^FS"
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 300}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD箱數:01^FS"
 
         # 班別
-        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 320}"
-        zpl_command += "^A0N,50,50"
-        zpl_command += f"^FDShift:night^FS"
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 400}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD班別:晚^FS"
 
         zpl_command += "^XZ"  # 結束ZPL命令
         
