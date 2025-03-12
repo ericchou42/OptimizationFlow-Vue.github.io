@@ -168,18 +168,17 @@ function saveWorkOrder() {
 
     $data = json_decode(file_get_contents('php://input'), true);
 
-    if (!isset($data['car']) || !isset($data['status'])) {
+    if (!isset($data['car'])) {
         echo json_encode(['success' => false, 'error' => '缺少必要參數']);
         return;
     }
 
     try {
         $sql = "UPDATE 機台看板 
-                SET 狀態 = ?, 工單號 = ?
+                SET 工單號 = ?
                 WHERE 機台 = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            $data['status'],
             $data['workOrder'] ?? null,
             $data['car']
         ]);

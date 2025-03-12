@@ -182,15 +182,7 @@
                                 <tr :id="`row-${item.car}`">
                                     <td class="car-cell">{{ item.car }}</td>
                                     <td class="status-cell">
-                                        <select :id="`machine-status-${item.car}`" 
-                                                class="form-control status-select"
-                                                v-model="item.currentStatus">
-                                            <option v-for="status in machineStatuses" 
-                                                    :key="status.id" 
-                                                    :value="status.id">
-                                                {{ status.id }} - {{ status.status_name }}
-                                            </option>
-                                        </select>
+                                        {{ item.currentStatus }} - {{ getMachineStatusName(item.currentStatus) }}
                                     </td>
                                     <td class="workorder-cell">
                                         <select :id="`workorder-${item.car}`" 
@@ -387,16 +379,11 @@ const saveWorkOrder = async (car) => {
     try {
         const response = await axios.post('./backend/query.php?action=save_work_order', {
             car: car,
-            status: item.currentStatus,
             workOrder: item.currentWorkOrder
         });
 
         if (response.data.success) {
             showMessage('更新成功', 'alert-success');
-            // 更新本地數據
-            item.currentStatusName = machineStatuses.value.find(
-                s => s.id === item.currentStatus
-            )?.status_name;
         } else {
             showMessage(response.data.error, 'alert-danger');
         }
@@ -436,6 +423,11 @@ onMounted(() => {
     window.addEventListener('resize', adjustTableColumns);
 });
 
+const getMachineStatusName = (statusId) => {
+    const status = machineStatuses.value.find(s => s.id === statusId);
+    return status ? status.status_name : '';
+};
+
 return {
     data,
     loading,
@@ -447,7 +439,8 @@ return {
     message,
     messageType,
     machineStatuses,
-    workOrders
+    workOrders,
+    getMachineStatusName
 };
             }
         });
