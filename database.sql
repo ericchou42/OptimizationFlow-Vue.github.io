@@ -58,10 +58,9 @@ CREATE TABLE IF NOT EXISTS 機台看板 (
     機台 VARCHAR(10) NOT NULL PRIMARY KEY,
     狀態 VARCHAR(5) DEFAULT 'B',
     工單號 VARCHAR(50),
-    箱數 INT,
-    架機人員 VARCHAR(50),
+    箱數 INT NOT NULL,
+    僱車人員 VARCHAR(50) NOT NULL,
     支數 VARCHAR(50),
-    僱車人員 VARCHAR(50),
     送料機 VARCHAR(50)
 );
 
@@ -77,7 +76,7 @@ INSERT INTO 機台看板 (機台) VALUES
 ('F07'),('F08'),('F09'),('F10'),('F11'),('F12'),('F13'),('F14'),('F15'),('F16');
 
 CREATE TABLE IF NOT EXISTS 生產紀錄表 (
-    條碼編號 VARCHAR(20) NOT NULL PRIMARY KEY,
+    條碼編號 VARCHAR(20) NOT NULL PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS 圖號表 (
