@@ -51,11 +51,11 @@ function getCarData() {
     header('Access-Control-Allow-Headers: Content-Type');
 
     try {
-        // 1. 獲取機台看板的基礎數據
-        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, 
-                       ms.狀態 as 狀態名稱, md.箱數, md.僱車人員, md.班別
+// 1. 獲取機台看板的基礎數據
+        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, ms.狀態 as 狀態名稱, md.箱數, md.僱車人員, md.班別
                 FROM 機台看板 md 
                 LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
+                WHERE md.狀態 = 'D'  /* 新增這一行，僅選取狀態為D的記錄 */
                 ORDER BY md.機台";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();

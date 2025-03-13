@@ -157,11 +157,6 @@
             
             <!-- 主要內容區域 -->
             <div v-if="!loading && !error">
-                <!-- 搜尋欄位 -->
-                <div class="mb-3">
-                    <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋機台狀態代碼">
-                </div>
-                
                 <!-- 表格區域，使用容器允許水平滾動 -->
                 <div class="table-container">
                     <!-- 重新設計的主表格，使用table-layout: auto自動調整寬度 -->
@@ -170,7 +165,6 @@
                         <thead>
                             <tr class="shared-header">
                                 <th>機台</th>
-                                <th>狀態</th>
                                 <th>工單號</th>
                                 <th>品名</th>
                                 <th>箱數</th>
@@ -186,7 +180,6 @@
                             <template v-for="(item, index) in filteredData" :key="index">
                                 <tr :id="`row-${item.car}`">
                                     <td class="car-cell">{{ item.car }}</td>
-                                    <td class="status-cell">{{ item.currentStatusName }}</td>
                                     <td class="workorder-cell">{{ item.currentWorkOrder }}</td>
                                     <td>{{ item.productName }}</td>
                                     <td>
@@ -329,15 +322,7 @@ const reprintBarcode = async (item) => {
 
 // 搜尋過濾功能
 const filteredData = computed(() => {
-    if (!searchTerm.value) return data.value;
-    
-    const term = searchTerm.value.toLowerCase();
-    
-    return data.value.filter(item => {        
-        // 檢查狀態代碼
-        if (item.currentStatus && item.currentStatus.toLowerCase().includes(term)) return true;    
-        return false;
-    });
+    return data.value.filter(item => item.currentStatus === 'D');
 });
                 
                 // 判斷是否需要高亮顯示
