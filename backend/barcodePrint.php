@@ -12,6 +12,15 @@ switch ($action) {
     case 'get_machine_status':
         getMachineStatus();
         break;
+    case 'update_machine':
+        updateMachine();
+        break;
+    case 'print_barcode':
+        printBarcode();
+        break;
+    case 'reprint_barcode':
+        reprintBarcode();
+        break;
     default:
         getCarData();
         break;
@@ -34,7 +43,6 @@ function getMachineStatus() {
     }
 }
 
-// 從第48行開始修改 getCarData() 函數
 function getCarData() {
     require_once 'config.php';
     header('Content-Type: application/json');
@@ -44,8 +52,10 @@ function getCarData() {
 
     try {
         // 1. 獲取機台看板的基礎數據
-        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號 
+        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, 
+                       ms.狀態 as 狀態名稱, md.箱數, md.僱車人員, md.班別
                 FROM 機台看板 md 
+                LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
                 ORDER BY md.機台";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
@@ -97,9 +107,13 @@ function getCarData() {
             $result[$carId] = [
                 'car' => $carId,
                 'currentStatus' => $dashboard['狀態'] ?: 'B',
+                'currentStatusName' => $dashboard['狀態名稱'] ?: '待排程',
                 'currentWorkOrder' => $workOrderId,
                 'productName' => $productName,
                 'drawingInfo' => $drawingInfo,
+                'boxCount' => $dashboard['箱數'] ?: '01',
+                'operator' => $dashboard['僱車人員'] ?: '',
+                'shift' => $dashboard['班別'] ?: '晚',
                 'scheduledOrders' => []
             ];
         }
@@ -226,6 +240,173 @@ function saveWorkOrder() {
             'success' => false,
             'error' => '更新失敗: ' . $e->getMessage()
         ]);
+    }
+}
+
+// 更新機台信息的函數
+function updateMachine() {
+    require_once 'config.php';
+    header('Content-Type: application/json');
+
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($data['car'])) {
+        echo json_encode(['success' => false, 'error' => '缺少必要參數']);
+        return;
+    }
+
+    try {
+        $sql = "UPDATE 機台看板 
+                SET 箱數 = ?, 僱車人員 = ?, 班別 = ?
+                WHERE 機台 = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            $data['boxCount'] ?? '01',
+            $data['operator'] ?? null,
+            $data['shift'] ?? '早',
+            $data['car']
+        ]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => '更新成功'
+        ]);
+
+    } catch (PDOException $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => '更新失敗: ' . $e->getMessage()
+        ]);
+    }
+}
+
+// 條碼列印功能
+function printBarcode() {
+    require_once 'config.php';
+    header('Content-Type: application/json');
+
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($data['car']) || !isset($data['workOrder'])) {
+        echo json_encode(['success' => false, 'error' => '缺少必要參數']);
+        return;
+    }
+
+    try {
+        // 先檢查生產紀錄表是否存在指定條碼
+        $boxCount = intval($data['boxCount'] ?? '01');
+        $car = $data['car'];
+        $workOrder = $data['workOrder'];
+        $operator = $data['operator'] ?? '';
+        $shift = $data['shift'] ?? '早';
+        $productName = $data['productName'] ?? '';
+        
+        // 開始事務處理
+        $pdo->beginTransaction();
+        
+        // 循環插入多個箱數記錄
+        for ($i = 1; $i <= $boxCount; $i++) {
+            $boxNumber = str_pad($i, 2, '0', STR_PAD_LEFT);
+            $barcodeId = $workOrder . $car . $boxNumber;
+            
+            // 檢查條碼是否已存在
+            $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 條碼編號 = ?";
+            $checkStmt = $pdo->prepare($checkSql);
+            $checkStmt->execute([$barcodeId]);
+            
+            if ($checkStmt->rowCount() == 0) {
+                // 條碼不存在，新增記錄
+                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 僱車人員, 班別) 
+                              VALUES (?, ?, ?, ?, ?, ?, ?)";
+                $insertStmt = $pdo->prepare($insertSql);
+                $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
+            }
+            
+            // 呼叫 Python 腳本執行列印
+            $command = "python barcode.py " . escapeshellarg($barcodeId) . " " . 
+                      escapeshellarg($workOrder) . " " . 
+                      escapeshellarg($productName) . " " . 
+                      escapeshellarg($operator) . " " . 
+                      escapeshellarg($car) . " " . 
+                      escapeshellarg($boxNumber) . " " . 
+                      escapeshellarg($shift);
+            
+            exec($command, $output, $returnVar);
+            
+            if ($returnVar !== 0) {
+                // 如果執行失敗，回滾事務
+                $pdo->rollBack();
+                echo json_encode(['success' => false, 'error' => '列印失敗: ' . implode("\n", $output)]);
+                return;
+            }
+        }
+        
+        // 提交事務
+        $pdo->commit();
+        
+        echo json_encode(['success' => true, 'message' => '列印成功']);
+        
+    } catch (PDOException $e) {
+        // 發生錯誤時回滾事務
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        echo json_encode(['success' => false, 'error' => '處理失敗: ' . $e->getMessage()]);
+    }
+}
+
+// 條碼重印功能
+function reprintBarcode() {
+    require_once 'config.php';
+    header('Content-Type: application/json');
+
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($data['car']) || !isset($data['workOrder']) || !isset($data['boxNumber'])) {
+        echo json_encode(['success' => false, 'error' => '缺少必要參數']);
+        return;
+    }
+
+    try {
+        $car = $data['car'];
+        $workOrder = $data['workOrder'];
+        $boxNumber = $data['boxNumber'];
+        $productName = $data['productName'] ?? '';
+        $operator = $data['operator'] ?? '';
+        $shift = $data['shift'] ?? '早';
+        
+        $barcodeId = $workOrder . $car . $boxNumber;
+        
+        // 檢查條碼是否存在
+        $checkSql = "SELECT * FROM 生產紀錄表 WHERE 條碼編號 = ?";
+        $checkStmt = $pdo->prepare($checkSql);
+        $checkStmt->execute([$barcodeId]);
+        
+        if ($checkStmt->rowCount() == 0) {
+            echo json_encode(['success' => false, 'error' => '未找到對應的條碼記錄']);
+            return;
+        }
+        
+        // 呼叫 Python 腳本執行列印
+        $command = "python barcode.py " . escapeshellarg($barcodeId) . " " . 
+                  escapeshellarg($workOrder) . " " . 
+                  escapeshellarg($productName) . " " . 
+                  escapeshellarg($operator) . " " . 
+                  escapeshellarg($car) . " " . 
+                  escapeshellarg($boxNumber) . " " . 
+                  escapeshellarg($shift);
+        
+        exec($command, $output, $returnVar);
+        
+        if ($returnVar !== 0) {
+            echo json_encode(['success' => false, 'error' => '重印失敗: ' . implode("\n", $output)]);
+            return;
+        }
+        
+        echo json_encode(['success' => true, 'message' => '重印成功']);
+        
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'error' => '處理失敗: ' . $e->getMessage()]);
     }
 }
 ?>

@@ -2,6 +2,7 @@ import mysql.connector
 from mysql.connector import Error
 from zebra import Zebra
 import socket
+import sys
 
 def connect_to_database():
     try:
@@ -122,10 +123,37 @@ def print_zebra_label(data):
 
 def main():
     # 連接到資料庫
-    connection = connect_to_database()
-    if not connection:
-        return
-    
+    # 檢查是否有命令行參數
+    if len(sys.argv) >= 8:
+        # 直接從命令行參數獲取資訊
+        barcode_id = sys.argv[1]
+        work_order = sys.argv[2]
+        product_name = sys.argv[3]
+        operator = sys.argv[4]
+        machine = sys.argv[5]
+        box_number = sys.argv[6]
+        shift = sys.argv[7]
+        
+        # 創建資料結構
+        data = {
+            '工單號': work_order,
+            '機台': machine,
+            '品名': product_name,
+            '顧車': operator,
+            '箱數': box_number,
+            '班別': shift
+        }
+        
+        # 直接列印標籤
+        print_zebra_label(data)
+        
+    else:
+        # 如果沒有足夠的命令行參數，則使用原來的互動式模式
+        # 連接到資料庫
+        connection = connect_to_database()
+        if not connection:
+            return
+        
     try:
         # 讓用戶輸入工單號
         work_order_number = input("請輸入工單號: ")
