@@ -341,8 +341,7 @@ const filteredData = computed(() => {
                            (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
                 };
 
-// 檢查條碼是否已被列印                
-const fetchData = async () => {
+                const fetchData = async () => {
     try {
         loading.value = true;
         const response = await axios.get('./backend/barcodePrint.php');
@@ -352,13 +351,16 @@ const fetchData = async () => {
         } else {
             // 確保每個項目都有正確的 currentStatus
             data.value = response.data.map(item => {
+                // 根據當前時間設定班別
+                const currentHour = new Date().getHours();
+                const defaultShift = currentHour < 12 ? '夜' : '日';
+                
                 return {
                     ...item,
                     currentStatus: item.currentStatus || 'B', // 如果後端沒有提供，則使用默認值
                     isPrinted: false, // 初始化為未列印
                     reprintBoxCount: '01', // 初始化重印箱數
-                    // 根據當前時間設定班別
-                    shift: item.shift || (new Date().getHours() < 12 ? '夜' : '日')
+                    shift: defaultShift // 根據時間設定班別
                 };
             });
             

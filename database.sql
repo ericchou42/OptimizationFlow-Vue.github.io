@@ -54,12 +54,13 @@ INSERT INTO 機台狀態 (代碼, 狀態) VALUES
 ('G', '待機(繼續車)'),
 ('H', '待訂');
 
+-- 修改機台看板表，移除班別欄位
 CREATE TABLE IF NOT EXISTS 機台看板 (
     機台 VARCHAR(10) NOT NULL PRIMARY KEY,
-    狀態 VARCHAR(5) DEFAULT 'B',
+    狀態 VARCHAR(5) DEFAULT 'D',
     工單號 VARCHAR(50),
-    箱數 INT NOT NULL,
-    僱車人員 VARCHAR(50) NOT NULL,
+    箱數 INT,
+    僱車人員 VARCHAR(50),
     支數 VARCHAR(50),
     送料機 VARCHAR(50)
 );
@@ -75,6 +76,7 @@ INSERT INTO 機台看板 (機台) VALUES
 ('C14'),('C15'),('C16'),('C17'),('F01'),('F02'),('F03'),('F04'),('F05'),('F06'),
 ('F07'),('F08'),('F09'),('F10'),('F11'),('F12'),('F13'),('F14'),('F15'),('F16');
 
+-- 修改生產紀錄表，增加日期欄位
 CREATE TABLE IF NOT EXISTS 生產紀錄表 (
     條碼編號 VARCHAR(20) NOT NULL PRIMARY KEY,
     工單號 VARCHAR(50) NOT NULL,
@@ -83,6 +85,7 @@ CREATE TABLE IF NOT EXISTS 生產紀錄表 (
     機台 VARCHAR(10) NOT NULL,
     箱數 VARCHAR(2) NOT NULL,
     班別 VARCHAR(10),
+    日期 VARCHAR(10),
     建立時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
