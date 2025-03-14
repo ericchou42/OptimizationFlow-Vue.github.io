@@ -121,8 +121,8 @@ def print_zebra_label(data):
     except Exception as e:
         print(f"打印機錯誤: {e}")
 
+# 將 main() 函數修改為：
 def main():
-    # 連接到資料庫
     # 檢查是否有命令行參數
     if len(sys.argv) >= 8:
         # 直接從命令行參數獲取資訊
@@ -146,41 +146,9 @@ def main():
         
         # 直接列印標籤
         print_zebra_label(data)
-        
     else:
-        # 如果沒有足夠的命令行參數，則使用原來的互動式模式
-        # 連接到資料庫
-        connection = connect_to_database()
-        if not connection:
-            return
-        
-    try:
-        # 讓用戶輸入工單號
-        work_order_number = input("請輸入工單號: ")
-        
-        # 獲取工單數據
-        data = get_work_order_data(connection, work_order_number)
-        
-        if data:
-            print("\n工單資料:")
-            print("-" * 50)
-            for key, value in data.items():
-                if value is not None:  # 只顯示有值的欄位
-                    print(f"{key}: {value}")
-            print("-" * 50)
-            
-            # 詢問是否要打印標籤
-            print_option = input("\n是否要打印標籤? (y/n): ")
-            if print_option.lower() == 'y':
-                print_zebra_label(data)
-        else:
-            print(f"找不到工單號為 '{work_order_number}' 的資料")
-            
-    except Exception as e:
-        print(f"發生錯誤: {e}")
-    finally:
-        if connection.is_connected():
-            connection.close()
+        print("參數不足，請確保提供所有必要參數")
+        print("使用方式: python barcode.py [條碼編號] [工單號] [品名] [顧車] [機台] [箱數] [班別]")
 
 if __name__ == "__main__":
     main()
