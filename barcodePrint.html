@@ -199,7 +199,9 @@
                                         </select>
                                     </td>
                                     <td>
-                                        <button @click="printBarcode(item)" class="btn btn-sm btn-primary">
+                                        <button @click="printBarcode(item)" 
+                                                class="btn btn-sm btn-primary"
+                                                :disabled="item.isPrinted">
                                             列印
                                         </button>
                                     </td>
@@ -211,7 +213,9 @@
                                         </select>
                                     </td>
                                     <td>
-                                        <button @click="reprintBarcode(item)" class="btn btn-sm btn-success">
+                                        <button @click="reprintBarcode(item)" 
+                                                class="btn btn-sm btn-success"
+                                                :disabled="!item.isPrinted">
                                             重印
                                         </button>
                                     </td>
@@ -243,6 +247,19 @@
                 const message = ref('');
                 const messageType = ref('');
                 
+// 檢查條碼是否已被列印過
+const isPrinted = async (car, workOrder) => {
+    try {
+        const response = await axios.post('./backend/barcodePrint.php?action=check_barcode', {
+            car: car,
+            workOrder: workOrder
+        });
+        return response.data.exists;
+    } catch (err) {
+        console.error('檢查條碼失敗:', err);
+        return false;
+    }
+};
 
 // 條碼列印功能
 const printBarcode = async (item) => {
@@ -257,31 +274,20 @@ const printBarcode = async (item) => {
     }
     
     try {
-        // 更新機台看板資料
-        const updateResponse = await axios.post('./backend/barcodePrint.php?action=update_machine', {
-            car: item.car,
-            boxCount: item.boxCount || '01',
-            operator: item.operator,
-            shift: item.shift || '早'
-        });
-        
-        if (!updateResponse.data.success) {
-            showMessage(updateResponse.data.error, 'alert-danger');
-            return;
-        }
-        
-        // 新增生產紀錄並執行列印
+        // 直接執行列印（後端會負責更新機台看板和插入生產紀錄）
         const printResponse = await axios.post('./backend/barcodePrint.php?action=print_barcode', {
             car: item.car,
             workOrder: item.currentWorkOrder,
             productName: item.productName,
             boxCount: item.boxCount || '01',
             operator: item.operator,
-            shift: item.shift || '早'
+            shift: item.shift || '日'
         });
         
         if (printResponse.data.success) {
             showMessage('列印成功', 'alert-success');
+            // 更新本地狀態，標記為已列印
+            item.isPrinted = true;
         } else {
             showMessage(printResponse.data.error, 'alert-danger');
         }
@@ -334,11 +340,12 @@ const filteredData = computed(() => {
                            (entry.actualWorkOrder && entry.actualWorkOrder.toLowerCase().includes(term)) ||
                            (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
                 };
-                
-                const fetchData = async () => {
+
+// 檢查條碼是否已被列印                
+const fetchData = async () => {
     try {
         loading.value = true;
-        const response = await axios.get('./backend/vehicle.php');
+        const response = await axios.get('./backend/barcodePrint.php');
         
         if (response.data.error) {
             error.value = response.data.error;
@@ -347,9 +354,18 @@ const filteredData = computed(() => {
             data.value = response.data.map(item => {
                 return {
                     ...item,
-                    currentStatus: item.currentStatus || 'B' // 如果後端沒有提供，則使用默認值
+                    currentStatus: item.currentStatus || 'B', // 如果後端沒有提供，則使用默認值
+                    isPrinted: false, // 初始化為未列印
+                    reprintBoxCount: '01' // 初始化重印箱數
                 };
             });
+            
+            // 檢查每個項目的列印狀態
+            for (const item of data.value) {
+                if (item.currentWorkOrder) {
+                    item.isPrinted = await isPrinted(item.car, item.currentWorkOrder);
+                }
+            }
             
             // 在數據加載後，添加延遲以確保表格已渲染
             setTimeout(() => {
@@ -472,7 +488,6 @@ const saveWorkOrder = async (car) => {
                 };
                 
 // 頁面載入時獲取數據
-// 在onMounted函數中初始化箱數、顧車、班別的預設值
 onMounted(() => {
     fetchMachineStatuses().then(() => {
         fetchData().then(() => {
@@ -481,7 +496,11 @@ onMounted(() => {
                 item.boxCount = item.boxCount || '01';
                 item.reprintBoxCount = '01';
                 item.operator = item.operator || '';
-                item.shift = item.shift || '夜';
+                
+                // 根據當前時間設定班別
+                const now = new Date();
+                const hour = now.getHours();
+                item.shift = item.shift || (hour < 12 ? '夜' : '日');
             });
         });
     });

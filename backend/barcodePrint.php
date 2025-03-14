@@ -21,6 +21,9 @@ switch ($action) {
     case 'reprint_barcode':
         reprintBarcode();
         break;
+    case 'check_barcode':
+        checkBarcode();
+        break;
     default:
         getCarData();
         break;
@@ -282,18 +285,21 @@ function updateMachine() {
 
 // 條碼列印功能
 function printBarcode() {
+    // 1. 連接資料庫並設置回應頭
     require_once 'config.php';
     header('Content-Type: application/json');
 
+    // 2. 接收前端傳來的資料
     $data = json_decode(file_get_contents('php://input'), true);
 
+    // 3. 檢查必要參數
     if (!isset($data['car']) || !isset($data['workOrder'])) {
         echo json_encode(['success' => false, 'error' => '缺少必要參數']);
         return;
     }
 
     try {
-        // 先檢查生產紀錄表是否存在指定條碼
+        // 4. 準備資料
         $boxCount = intval($data['boxCount'] ?? '01');
         $car = $data['car'];
         $workOrder = $data['workOrder'];
@@ -301,29 +307,33 @@ function printBarcode() {
         $shift = $data['shift'] ?? '日';
         $productName = $data['productName'] ?? '';
         
-        // 開始事務處理
+        // 5. 開始事務處理
         $pdo->beginTransaction();
+        // 更新機台看板資料
+            $updateSql = "UPDATE 機台看板 SET 箱數 = ?, 僱車人員 = ?, 班別 = ? WHERE 機台 = ?";
+            $updateStmt = $pdo->prepare($updateSql);
+            $updateStmt->execute([$boxCount, $operator, $shift, $car]);
         
-        // 循環插入多個箱數記錄
+        // 6. 循環插入多個箱數記錄
         for ($i = 1; $i <= $boxCount; $i++) {
             $boxNumber = str_pad($i, 2, '0', STR_PAD_LEFT);
             $barcodeId = $workOrder . $car . $boxNumber;
             
-            // 檢查條碼是否已存在
+            // 7. 檢查條碼是否已存在
             $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 條碼編號 = ?";
             $checkStmt = $pdo->prepare($checkSql);
             $checkStmt->execute([$barcodeId]);
             
             if ($checkStmt->rowCount() == 0) {
-                // 條碼不存在，新增記錄
+                // 8. 條碼不存在，新增記錄
                 $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 僱車人員, 班別) 
-                              VALUES (?, ?, ?, ?, ?, ?, ?)";
+                          VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $insertStmt = $pdo->prepare($insertSql);
                 $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
             }
             
-            // 呼叫 Python 腳本執行列印
-            $command = "python barcode.py " . escapeshellarg($barcodeId) . " " . 
+            // 9. 呼叫 Python 腳本執行列印
+            $command = "python /barcode.py " . escapeshellarg($barcodeId) . " " . 
                       escapeshellarg($workOrder) . " " . 
                       escapeshellarg($productName) . " " . 
                       escapeshellarg($operator) . " " . 
@@ -334,20 +344,20 @@ function printBarcode() {
             exec($command, $output, $returnVar);
             
             if ($returnVar !== 0) {
-                // 如果執行失敗，回滾事務
+                // 10. 如果執行失敗，回滾事務
                 $pdo->rollBack();
                 echo json_encode(['success' => false, 'error' => '列印失敗: ' . implode("\n", $output)]);
                 return;
             }
         }
         
-        // 提交事務
+        // 11. 提交事務
         $pdo->commit();
         
         echo json_encode(['success' => true, 'message' => '列印成功']);
         
     } catch (PDOException $e) {
-        // 發生錯誤時回滾事務
+        // 12. 發生錯誤時回滾事務
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
@@ -381,14 +391,14 @@ function reprintBarcode() {
         $checkSql = "SELECT * FROM 生產紀錄表 WHERE 條碼編號 = ?";
         $checkStmt = $pdo->prepare($checkSql);
         $checkStmt->execute([$barcodeId]);
-        
+
         if ($checkStmt->rowCount() == 0) {
             echo json_encode(['success' => false, 'error' => '未找到對應的條碼記錄']);
             return;
         }
         
         // 呼叫 Python 腳本執行列印
-        $command = "python barcode.py " . escapeshellarg($barcodeId) . " " . 
+        $command = "python /barcode.py " . escapeshellarg($barcodeId) . " " . 
                   escapeshellarg($workOrder) . " " . 
                   escapeshellarg($productName) . " " . 
                   escapeshellarg($operator) . " " . 
@@ -407,6 +417,40 @@ function reprintBarcode() {
         
     } catch (PDOException $e) {
         echo json_encode(['success' => false, 'error' => '處理失敗: ' . $e->getMessage()]);
+    }
+}
+// 檢查條碼是否已存在
+function checkBarcode() {
+    require_once 'config.php';
+    header('Content-Type: application/json');
+
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($data['car']) || !isset($data['workOrder'])) {
+        echo json_encode(['success' => false, 'error' => '缺少必要參數']);
+        return;
+    }
+
+    try {
+        $car = $data['car'];
+        $workOrder = $data['workOrder'];
+        
+        // 檢查是否有對應的條碼記錄
+        $sql = "SELECT COUNT(*) as count FROM 生產紀錄表 WHERE 條碼編號 LIKE ? AND 工單號 = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$workOrder . $car . '%', $workOrder]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'exists' => ($result['count'] > 0)
+        ]);
+        
+    } catch (PDOException $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => '檢查失敗: ' . $e->getMessage()
+        ]);
     }
 }
 ?>
