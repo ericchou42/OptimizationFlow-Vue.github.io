@@ -309,31 +309,42 @@ function printBarcode() {
         
         // 5. 開始事務處理
         $pdo->beginTransaction();
-        // 更新機台看板資料
-            $updateSql = "UPDATE 機台看板 SET 箱數 = ?, 僱車人員 = ?, 班別 = ? WHERE 機台 = ?";
-            $updateStmt = $pdo->prepare($updateSql);
-            $updateStmt->execute([$boxCount, $operator, $shift, $car]);
         
-        // 6. 循環插入多個箱數記錄
+        // 6. 更新機台看板資料
+        $updateSql = "UPDATE 機台看板 SET 箱數 = ?, 僱車人員 = ?, 班別 = ? WHERE 機台 = ?";
+        $updateStmt = $pdo->prepare($updateSql);
+        $updateStmt->execute([$boxCount, $operator, $shift, $car]);
+        
+        // 7. 循環插入多個箱數記錄
+        $barcodeIds = [];
         for ($i = 1; $i <= $boxCount; $i++) {
             $boxNumber = str_pad($i, 2, '0', STR_PAD_LEFT);
             $barcodeId = $workOrder . $car . $boxNumber;
+            $barcodeIds[] = $barcodeId;
             
-            // 7. 檢查條碼是否已存在
+            // 8. 檢查條碼是否已存在
             $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 條碼編號 = ?";
             $checkStmt = $pdo->prepare($checkSql);
             $checkStmt->execute([$barcodeId]);
             
             if ($checkStmt->rowCount() == 0) {
-                // 8. 條碼不存在，新增記錄
+                // 9. 條碼不存在，新增記錄
                 $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 僱車人員, 班別) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $insertStmt = $pdo->prepare($insertSql);
                 $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
             }
+        }
+        
+        // 10. 提交資料庫變更
+        $pdo->commit();
+        
+        // 11. 循環執行列印
+        $printErrors = [];
+        foreach ($barcodeIds as $index => $barcodeId) {
+            $boxNumber = str_pad($index + 1, 2, '0', STR_PAD_LEFT);
             
-            // 9. 呼叫 Python 腳本執行列印
-            $command = "python /barcode.py " . escapeshellarg($barcodeId) . " " . 
+            $command = "python ../barcode.py " . escapeshellarg($barcodeId) . " " . 
                       escapeshellarg($workOrder) . " " . 
                       escapeshellarg($productName) . " " . 
                       escapeshellarg($operator) . " " . 
@@ -344,20 +355,20 @@ function printBarcode() {
             exec($command, $output, $returnVar);
             
             if ($returnVar !== 0) {
-                // 10. 如果執行失敗，回滾事務
-                $pdo->rollBack();
-                echo json_encode(['success' => false, 'error' => '列印失敗: ' . implode("\n", $output)]);
-                return;
+                $printErrors[] = "箱號 $boxNumber 列印失敗: " . implode("\n", $output);
             }
         }
         
-        // 11. 提交事務
-        $pdo->commit();
+        // 12. 檢查是否有列印錯誤
+        if (!empty($printErrors)) {
+            echo json_encode(['success' => false, 'error' => implode("\n", $printErrors)]);
+            return;
+        }
         
         echo json_encode(['success' => true, 'message' => '列印成功']);
         
     } catch (PDOException $e) {
-        // 12. 發生錯誤時回滾事務
+        // 13. 發生錯誤時回滾事務
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
@@ -398,7 +409,7 @@ function reprintBarcode() {
         }
         
         // 呼叫 Python 腳本執行列印
-        $command = "python /barcode.py " . escapeshellarg($barcodeId) . " " . 
+        $command = "python ../barcode.py " . escapeshellarg($barcodeId) . " " . 
                   escapeshellarg($workOrder) . " " . 
                   escapeshellarg($productName) . " " . 
                   escapeshellarg($operator) . " " . 

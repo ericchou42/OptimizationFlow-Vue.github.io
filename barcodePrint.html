@@ -274,7 +274,7 @@ const printBarcode = async (item) => {
     }
     
     try {
-        // 直接執行列印（後端會負責更新機台看板和插入生產紀錄）
+        // 先執行列印（後端會負責更新機台看板和插入生產紀錄）
         const printResponse = await axios.post('./backend/barcodePrint.php?action=print_barcode', {
             car: item.car,
             workOrder: item.currentWorkOrder,
@@ -289,7 +289,7 @@ const printBarcode = async (item) => {
             // 更新本地狀態，標記為已列印
             item.isPrinted = true;
         } else {
-            showMessage(printResponse.data.error, 'alert-danger');
+            showMessage(printResponse.data.error || '列印失敗', 'alert-danger');
         }
         
     } catch (err) {
@@ -356,7 +356,9 @@ const fetchData = async () => {
                     ...item,
                     currentStatus: item.currentStatus || 'B', // 如果後端沒有提供，則使用默認值
                     isPrinted: false, // 初始化為未列印
-                    reprintBoxCount: '01' // 初始化重印箱數
+                    reprintBoxCount: '01', // 初始化重印箱數
+                    // 根據當前時間設定班別
+                    shift: item.shift || (new Date().getHours() < 12 ? '夜' : '日')
                 };
             });
             
@@ -383,7 +385,7 @@ const fetchData = async () => {
 // 獲取機台狀態下拉選單資料
 const fetchMachineStatuses = async () => {
     try {
-        const response = await axios.get('./backend/vehicle.php?action=get_machine_status');
+        const response = await axios.get('./backend/barcodePrint.php?action=get_machine_status');
         if (response.data.error) {
             error.value = response.data.error;
         } else {
@@ -397,7 +399,7 @@ const fetchMachineStatuses = async () => {
 // 獲取工單下拉選單資料
 const fetchWorkOrders = async () => {
     try {
-        const response = await axios.get('./backend/vehicle.php?action=get_work_orders');
+        const response = await axios.get('./backend/barcodePrint.php?action=get_work_orders');
         if (response.data.error) {
             error.value = response.data.error;
         } else {
@@ -448,7 +450,7 @@ const saveWorkOrder = async (car) => {
     if (!item) return;
 
     try {
-        const response = await axios.post('./backend/vehicle.php?action=save_work_order', {
+        const response = await axios.post('./backend/barcodePrint.php?action=save_work_order', {
             car: car,
             status: item.currentStatus,
             workOrder: item.currentWorkOrder
@@ -491,16 +493,12 @@ const saveWorkOrder = async (car) => {
 onMounted(() => {
     fetchMachineStatuses().then(() => {
         fetchData().then(() => {
-            // 初始化每個機台的箱數、顧車和班別
+            // 初始化每個機台的箱數、僱車
             data.value.forEach(item => {
                 item.boxCount = item.boxCount || '01';
                 item.reprintBoxCount = '01';
                 item.operator = item.operator || '';
-                
-                // 根據當前時間設定班別
-                const now = new Date();
-                const hour = now.getHours();
-                item.shift = item.shift || (hour < 12 ? '夜' : '日');
+                // 班別已在 fetchData 中設定
             });
         });
     });
