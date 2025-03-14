@@ -194,9 +194,8 @@
                                     </td>
                                     <td>
                                         <select v-model="item.shift" class="form-control">
-                                            <option value="早">早</option>
-                                            <option value="中">中</option>
-                                            <option value="晚">晚</option>
+                                            <option value="日">日</option>
+                                            <option value="夜">夜</option>
                                         </select>
                                     </td>
                                     <td>
@@ -482,7 +481,7 @@ onMounted(() => {
                 item.boxCount = item.boxCount || '01';
                 item.reprintBoxCount = '01';
                 item.operator = item.operator || '';
-                item.shift = item.shift || '晚';
+                item.shift = item.shift || '夜';
             });
         });
     });

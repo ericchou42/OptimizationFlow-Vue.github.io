@@ -113,7 +113,7 @@ function getCarData() {
                 'drawingInfo' => $drawingInfo,
                 'boxCount' => $dashboard['箱數'] ?: '01',
                 'operator' => $dashboard['僱車人員'] ?: '',
-                'shift' => $dashboard['班別'] ?: '晚',
+                'shift' => $dashboard['班別'] ?: '夜',
                 'scheduledOrders' => []
             ];
         }
@@ -263,7 +263,7 @@ function updateMachine() {
         $stmt->execute([
             $data['boxCount'] ?? '01',
             $data['operator'] ?? null,
-            $data['shift'] ?? '早',
+            $data['shift'] ?? '日',
             $data['car']
         ]);
 
@@ -298,7 +298,7 @@ function printBarcode() {
         $car = $data['car'];
         $workOrder = $data['workOrder'];
         $operator = $data['operator'] ?? '';
-        $shift = $data['shift'] ?? '早';
+        $shift = $data['shift'] ?? '日';
         $productName = $data['productName'] ?? '';
         
         // 開始事務處理
@@ -373,7 +373,7 @@ function reprintBarcode() {
         $boxNumber = $data['boxNumber'];
         $productName = $data['productName'] ?? '';
         $operator = $data['operator'] ?? '';
-        $shift = $data['shift'] ?? '早';
+        $shift = $data['shift'] ?? '日';
         
         $barcodeId = $workOrder . $car . $boxNumber;
         
