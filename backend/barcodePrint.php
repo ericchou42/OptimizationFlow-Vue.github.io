@@ -55,11 +55,14 @@ function getCarData() {
 
     try {
 // 1. 獲取機台看板的基礎數據
-        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, ms.狀態 as 狀態名稱, md.箱數, md.僱車人員, md.班別
-                FROM 機台看板 md 
-                LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
-                WHERE md.狀態 = 'D'  /* 新增這一行，僅選取狀態為D的記錄 */
-                ORDER BY md.機台";
+$sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, ms.狀態 as 狀態名稱, 
+        (SELECT br.箱數 FROM 生產紀錄表 br WHERE br.機台 = md.機台 AND br.工單號 = md.工單號 ORDER BY br.建立時間 DESC LIMIT 1) as 箱數,
+        (SELECT br.顧車 FROM 生產紀錄表 br WHERE br.機台 = md.機台 AND br.工單號 = md.工單號 ORDER BY br.建立時間 DESC LIMIT 1) as 顧車,
+        (SELECT br.班別 FROM 生產紀錄表 br WHERE br.機台 = md.機台 AND br.工單號 = md.工單號 ORDER BY br.建立時間 DESC LIMIT 1) as 班別
+        FROM 機台看板 md 
+        LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
+        WHERE md.狀態 = 'D'  /* 新增這一行，僅選取狀態為D的記錄 */
+        ORDER BY md.機台";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
         $dashboardData = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -116,7 +119,7 @@ foreach ($dashboardData as $dashboard) {
         'productName' => $productName,
         'drawingInfo' => $drawingInfo,
         'boxCount' => $dashboard['箱數'] ?: '01',
-        'operator' => $dashboard['僱車人員'] ?: '',
+        'operator' => $dashboard['顧車'] ?: '',
         'shift' => $dashboard['班別'] ?: '夜',
         'scheduledOrders' => []
     ];
@@ -261,13 +264,11 @@ function updateMachine() {
 
     try {
         $sql = "UPDATE 機台看板 
-                SET 箱數 = ?, 僱車人員 = ?, 班別 = ?
+                SET 箱數 = ?
                 WHERE 機台 = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             $data['boxCount'] ?? '01',
-            $data['operator'] ?? null,
-            $data['shift'] ?? '日',
             $data['car']
         ]);
 
@@ -311,10 +312,10 @@ function printBarcode() {
         // 5. 開始事務處理
         $pdo->beginTransaction();
         
-        // 6. 更新機台看板資料 (移除班別欄位)
-        $updateSql = "UPDATE 機台看板 SET 箱數 = ?, 僱車人員 = ? WHERE 機台 = ?";
-        $updateStmt = $pdo->prepare($updateSql);
-        $updateStmt->execute([$boxCount, $operator, $shift, $car]);
+// 6. 更新機台看板資料 (移除班別欄位)
+$updateSql = "UPDATE 機台看板 SET 箱數 = ? WHERE 機台 = ?";
+$updateStmt = $pdo->prepare($updateSql);
+$updateStmt->execute([$boxCount, $car]);
         
         // 7. 循環插入多個箱數記錄
         $barcodeIds = [];
@@ -330,7 +331,7 @@ function printBarcode() {
             
             if ($checkStmt->rowCount() == 0) {
                 // 9. 條碼不存在，新增記錄
-                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 僱車人員, 班別) 
+                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $insertStmt = $pdo->prepare($insertSql);
                 $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);

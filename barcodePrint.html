@@ -183,8 +183,8 @@
                                     <td class="workorder-cell">{{ item.currentWorkOrder }}</td>
                                     <td>{{ item.productName }}</td>
                                     <td>
-                                        <select v-model="item.boxCount" class="form-control">
-                                            <option v-for="n in 10" :key="n" :value="n.toString().padStart(2, '0')">
+                                        <select v-model="item.reprintBoxCount" class="form-control">
+                                            <option v-for="n in parseInt(item.boxCount || '1')" :key="n" :value="n.toString().padStart(2, '0')">
                                                 {{ n.toString().padStart(2, '0') }}
                                             </option>
                                         </select>
@@ -357,12 +357,14 @@ const filteredData = computed(() => {
                     currentStatus: item.currentStatus || 'B', // 如果後端沒有提供，則使用默認值
                     isPrinted: false, // 初始化為未列印
                     reprintBoxCount: '01', // 初始化重印箱數
-                                        // 根據當前時間設定班別
-                                        shift: item.shift || (new Date().getHours() < 12 ? '夜' : '日')
+                    // 根據從資料庫獲取的班別或當前時間設定班別
+                    shift: item.shift || (new Date().getHours() < 12 ? '夜' : '日'),
+                    // 保留從資料庫中獲取的僱車人員
+                    operator: item.operator || ''
                 };
             });
             
-            // 檢查每個項目的列印狀態
+            // 檢查每個項目的列印狀態並設置可用的箱數選項
             for (const item of data.value) {
                 if (item.currentWorkOrder) {
                     item.isPrinted = await isPrinted(item.car, item.currentWorkOrder);
@@ -493,13 +495,13 @@ const saveWorkOrder = async (car) => {
 onMounted(() => {
     fetchMachineStatuses().then(() => {
         fetchData().then(() => {
-            // 初始化每個機台的箱數、僱車
-            data.value.forEach(item => {
-                item.boxCount = item.boxCount || '01';
-                item.reprintBoxCount = '01';
-                item.operator = item.operator || '';
-                // 班別已在 fetchData 中設定
-            });
+// 初始化每個機台的箱數、僱車
+data.value.forEach(item => {
+    item.boxCount = item.boxCount || '01';
+    item.reprintBoxCount = '01';
+    item.operator = item.operator || '';
+    // 班別已在 fetchData 中設定，從生產紀錄表獲取
+});
         });
     });
     

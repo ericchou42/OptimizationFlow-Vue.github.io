@@ -54,13 +54,12 @@ INSERT INTO 機台狀態 (代碼, 狀態) VALUES
 ('G', '待機(繼續車)'),
 ('H', '待訂');
 
--- 修改機台看板表，移除班別欄位
+-- 修改機台看板表，移除班別、僱車人員欄位
 CREATE TABLE IF NOT EXISTS 機台看板 (
     機台 VARCHAR(10) NOT NULL PRIMARY KEY,
     狀態 VARCHAR(5) DEFAULT 'D',
     工單號 VARCHAR(50),
     箱數 INT,
-    僱車人員 VARCHAR(50),
     支數 VARCHAR(50),
     送料機 VARCHAR(50)
 );
