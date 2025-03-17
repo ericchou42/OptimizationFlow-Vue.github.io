@@ -54,11 +54,11 @@ function getCarData() {
     header('Access-Control-Allow-Headers: Content-Type');
 
     try {
-        // 1. 獲取機台看板的基礎數據 (移除班別欄位)
-        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, ms.狀態 as 狀態名稱, md.箱數, md.僱車人員
+// 1. 獲取機台看板的基礎數據
+        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, ms.狀態 as 狀態名稱, md.箱數, md.僱車人員, md.班別
                 FROM 機台看板 md 
                 LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
-                WHERE md.狀態 = 'D'
+                WHERE md.狀態 = 'D'  /* 新增這一行，僅選取狀態為D的記錄 */
                 ORDER BY md.機台";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
@@ -107,8 +107,6 @@ foreach ($dashboardData as $dashboard) {
     $productName = isset($workOrderMap[$workOrderId]) ? $workOrderMap[$workOrderId] : "";
     $drawingInfo = isset($drawingMap[$productName]) ? $drawingMap[$productName] : null;
     
-    // 根據當前時間設定預設班別
-    $defaultShift = (date('H') < 12) ? '夜' : '日';
     
     $result[$carId] = [
         'car' => $carId,
@@ -119,7 +117,7 @@ foreach ($dashboardData as $dashboard) {
         'drawingInfo' => $drawingInfo,
         'boxCount' => $dashboard['箱數'] ?: '01',
         'operator' => $dashboard['僱車人員'] ?: '',
-        'shift' => $defaultShift, // 使用預設班別值，而非從資料庫獲取
+        'shift' => $dashboard['班別'] ?: '夜',
         'scheduledOrders' => []
     ];
 }
@@ -309,7 +307,6 @@ function printBarcode() {
         $operator = $data['operator'] ?? '';
         $shift = $data['shift'] ?? '日';
         $productName = $data['productName'] ?? '';
-        $date = date('Y/m/d'); // 新增日期變數，格式為西元年/月/日
         
         // 5. 開始事務處理
         $pdo->beginTransaction();
@@ -317,7 +314,7 @@ function printBarcode() {
         // 6. 更新機台看板資料 (移除班別欄位)
         $updateSql = "UPDATE 機台看板 SET 箱數 = ?, 僱車人員 = ? WHERE 機台 = ?";
         $updateStmt = $pdo->prepare($updateSql);
-        $updateStmt->execute([$boxCount, $operator, $car]);
+        $updateStmt->execute([$boxCount, $operator, $shift, $car]);
         
         // 7. 循環插入多個箱數記錄
         $barcodeIds = [];
@@ -332,11 +329,11 @@ function printBarcode() {
             $checkStmt->execute([$barcodeId]);
             
             if ($checkStmt->rowCount() == 0) {
-                // 9. 條碼不存在，新增記錄 (加入日期欄位)
-                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 僱車人員, 班別, 日期) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                // 9. 條碼不存在，新增記錄
+                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 僱車人員, 班別) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $insertStmt = $pdo->prepare($insertSql);
-                $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift, $date]);
+                $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
             }
         }
         
@@ -354,13 +351,29 @@ function printBarcode() {
                       escapeshellarg($operator) . " " . 
                       escapeshellarg($car) . " " . 
                       escapeshellarg($boxNumber) . " " . 
-                      escapeshellarg($shift) . " " . 
-                      escapeshellarg($date);
+                      escapeshellarg($shift);
             
             exec($command, $output, $returnVar);
             
             if ($returnVar !== 0) {
                 $printErrors[] = "箱號 $boxNumber 列印失敗: " . implode("\n", $output);
+            }
+        }
+        
+        // 12. 檢查是否有列印錯誤
+        if (!empty($printErrors)) {
+            echo json_encode(['success' => false, 'error' => implode("\n", $printErrors)]);
+            return;
+        }
+        
+        echo json_encode(['success' => true, 'message' => '列印成功']);
+        
+    } catch (PDOException $e) {
+        // 13. 發生錯誤時回滾事務
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        echo json_encode(['success' => false, 'error' => '處理失敗: ' . $e->getMessage()]);
             }
         }
 
@@ -383,7 +396,6 @@ function reprintBarcode() {
         $productName = $data['productName'] ?? '';
         $operator = $data['operator'] ?? '';
         $shift = $data['shift'] ?? '日';
-        $date = date('Y/m/d'); // 新增日期變數
         
         $barcodeId = $workOrder . $car . $boxNumber;
         
@@ -404,10 +416,21 @@ function reprintBarcode() {
                   escapeshellarg($operator) . " " . 
                   escapeshellarg($car) . " " . 
                   escapeshellarg($boxNumber) . " " . 
-                  escapeshellarg($shift) . " " . 
-                  escapeshellarg($date);
+                  escapeshellarg($shift);
         
         exec($command, $output, $returnVar);
+                
+        if ($returnVar !== 0) {
+            echo json_encode(['success' => false, 'error' => '重印失敗: ' . implode("\n", $output)]);
+            return;
+        }
+        
+        echo json_encode(['success' => true, 'message' => '重印成功']);
+        
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'error' => '處理失敗: ' . $e->getMessage()]);
+    }
+}
 // 檢查條碼是否已存在
 function checkBarcode() {
     require_once 'config.php';
