@@ -2,6 +2,16 @@ import mysql.connector
 from mysql.connector import Error
 from zebra import Zebra
 import socket
+import sys
+import datetime
+import logging
+
+# 設定日誌
+logging.basicConfig(
+    filename='label_log.txt',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def connect_to_database():
     try:
@@ -14,6 +24,7 @@ def connect_to_database():
         if connection.is_connected():
             return connection
     except Error as e:
+        logging.error(f"資料庫連接錯誤: {e}")
         print(f"資料庫連接錯誤: {e}")
     return None
 
@@ -29,11 +40,17 @@ def get_work_order_data(connection, work_order_number):
         cursor.close()
         return result
     except Error as e:
+        logging.error(f"查詢錯誤: {e}")
         print(f"查詢錯誤: {e}")
         return None
 
 def print_zebra_label(data):
     try:
+        logging.info(f"開始打印標籤，資料: {data}")
+        
+        # 獲取當前日期
+        current_date = datetime.datetime.now().strftime("%Y/%m/%d")
+        
         # 定義標籤參數
         # XY軸位置
         x_position = 200
@@ -46,7 +63,7 @@ def print_zebra_label(data):
         # 準備ZPL命令 - 使用英文標籤避免編碼問題
         zpl_command = "^XA"  # 開始ZPL命令
 
-        # # 設定中文碼頁
+        # 設定中文碼頁
         zpl_command += "^CI28" # 使用 Big5 編碼 (台灣繁體中文)
         
         # 設定條碼起始位置
@@ -73,22 +90,22 @@ def print_zebra_label(data):
         # 入庫日期
         zpl_command += f"^FO{x_position},{y_position}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD日期:2025/03/17^FS"
+        zpl_command += f"^FD日期:{current_date}^FS"
 
         # 品名
         zpl_command += f"^FO{x_position},{y_position + 100}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD品名:081-5052-1^FS"
+        zpl_command += f"^FD品名:{data['品名']}^FS"
 
         # 料號
         zpl_command += f"^FO{x_position},{y_position + 200}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD料號:41A011706A0M^FS"
+        zpl_command += f"^FD料號:{data['料號']}^FS"
 
         # 備註 車台
         zpl_command += f"^FO{x_position},{y_position + 300}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD機台: {data['機台']}^FS"
+        zpl_command += f"^FD機台:{data['機台']}^FS"
 
         # 後續單位
         zpl_command += f"^FO{x_position},{y_position + 400}"
@@ -98,27 +115,22 @@ def print_zebra_label(data):
         # 人員
         zpl_command += f"^FO{x_position},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD人員:王小明^FS"
+        zpl_command += f"^FD人員:{data['檢驗人']}^FS"
 
-        # 數量
+        # 重量
         zpl_command += f"^FO{x_position_right},{y_position + 300}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD數量:2074^FS"
+        zpl_command += f"^FD重量:{data['重量']}^FS"
 
-        # 淨重
+        # 淨重（單重）
         zpl_command += f"^FO{x_position_right},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD淨重:2.42^FS"
+        zpl_command += f"^FD單重:{data['單重']}^FS"
 
         # 班別
         zpl_command += f"^FO{x_position_right},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD班別:夜^FS"
-
-        # 異常品
-        zpl_command += f"^FO{750},{y_position}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD[異常]^FS"
+        zpl_command += f"^FD班別:{data['班別']}^FS"
 
         # HSF
         zpl_command += f"^FO{30},{y_position + 530}"
@@ -131,6 +143,8 @@ def print_zebra_label(data):
         # 使用網路打印可能解決這個問題
         printer_ip = "172.29.123.150"
         printer_port = 9100
+        
+        logging.info(f"嘗試連接打印機 {printer_ip}:{printer_port}")
         printer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         printer_socket.connect((printer_ip, printer_port))
 
@@ -139,42 +153,83 @@ def print_zebra_label(data):
         printer_socket.send(encoded_command)
         printer_socket.close()
         
+        logging.info("標籤已發送到打印機")
         print("標籤已發送到打印機")
+        return True
         
     except Exception as e:
+        logging.error(f"打印機錯誤: {e}")
         print(f"打印機錯誤: {e}")
+        return False
 
 def main():
-    # 連接到資料庫
-    connection = connect_to_database()
-    if not connection:
-        return
+    logging.info("Label.py 執行開始")
+    logging.info(f"命令行參數: {sys.argv}")
     
-    try:
-        # 讓用戶輸入工單號
-        work_order_number = input("請輸入工單號: ")
+    # 檢查命令行參數
+    if len(sys.argv) >= 9:
+        # 從命令行直接使用參數
+        work_order = sys.argv[1]
+        product_name = sys.argv[2]
+        part_number = sys.argv[3]
+        operator = sys.argv[4]
+        machine = sys.argv[5]
+        weight = sys.argv[6]
+        unit_weight = sys.argv[7]
+        inspector = sys.argv[8]
+        shift = sys.argv[9] if len(sys.argv) > 9 else '日'
         
-        # 獲取工單數據
-        data = get_work_order_data(connection, work_order_number)
+        # 構建數據字典
+        data = {
+            '工單號': work_order,
+            '品名': product_name,
+            '料號': part_number,
+            '顧車': operator,
+            '機台': machine,
+            '重量': weight,
+            '單重': unit_weight,
+            '檢驗人': inspector,
+            '班別': shift
+        }
         
-        if data:
-            print("\n工單資料:")
-            print("-" * 50)
-            for key, value in data.items():
-                if value is not None:  # 只顯示有值的欄位
-                    print(f"{key}: {value}")
-            print("-" * 50)
+        # 直接打印標籤
+        success = print_zebra_label(data)
+        sys.exit(0 if success else 1)
+    else:
+        # 連接到資料庫
+        connection = connect_to_database()
+        if not connection:
+            sys.exit(1)
+        
+        try:
+            # 讓用戶輸入工單號
+            work_order_number = input("請輸入工單號: ")
             
-            # 詢問是否要打印標籤
-            print_zebra_label(data)
-        else:
-            print(f"找不到工單號為 '{work_order_number}' 的資料")
+            # 獲取工單數據
+            data = get_work_order_data(connection, work_order_number)
             
-    except Exception as e:
-        print(f"發生錯誤: {e}")
-    finally:
-        if connection.is_connected():
-            connection.close()
+            if data:
+                print("\n工單資料:")
+                print("-" * 50)
+                for key, value in data.items():
+                    if value is not None:  # 只顯示有值的欄位
+                        print(f"{key}: {value}")
+                print("-" * 50)
+                
+                # 詢問是否要打印標籤
+                success = print_zebra_label(data)
+                sys.exit(0 if success else 1)
+            else:
+                print(f"找不到工單號為 '{work_order_number}' 的資料")
+                sys.exit(1)
+                
+        except Exception as e:
+            logging.error(f"發生錯誤: {e}")
+            print(f"發生錯誤: {e}")
+            sys.exit(1)
+        finally:
+            if connection.is_connected():
+                connection.close()
 
 if __name__ == "__main__":
     main()

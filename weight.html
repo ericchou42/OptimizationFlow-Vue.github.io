@@ -3,179 +3,409 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>條碼重量管理系統</title>
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <title>條碼檢驗與重量管理系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
+        body {
+            font-family: Arial, sans-serif;
             padding: 20px;
+            font-size: 16px;
+            touch-action: manipulation; /* 優化觸控體驗 */
         }
-        .form-group {
+        .fullscreen-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            font-size: 18px;
+            padding: 5px 10px;
+        }
+        .inspector-selection {
+            margin-bottom: 25px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .inspector-option {
+            font-size: 20px;
+            margin-right: 15px;
+            cursor: pointer;
+            padding: 10px;
+            display: inline-block;
+        }
+        .inspector-checkbox {
+            transform: scale(1.5);
+            margin-right: 8px;
+        }
+        .barcode-section {
+            margin-bottom: 20px;
+        }
+        #barcode {
+            font-size: 20px;
+            padding: 10px;
+            width: 100%;
             margin-bottom: 15px;
         }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
+        .product-info {
+            margin-bottom: 25px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
         }
-        .form-group select,
-        .form-group input {
+        .product-info table {
             width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
+        }
+        .product-info th {
+            width: 120px;
+            text-align: right;
+            padding-right: 15px;
+        }
+        .weight-controls {
+            margin-bottom: 25px;
         }
         .weight-display {
-            font-size: 24px;
-            margin: 20px 0;
+            font-size: 36px;
+            margin: 15px 0;
             padding: 10px;
-            background-color: #f0f0f0;
+            background-color: #e9ecef;
             text-align: center;
+            border-radius: 5px;
         }
-        .submit-btn {
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
+        .weight-input {
+            margin-top: 15px;
         }
-        .submit-btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
+        .unit-weight-input {
+            margin-top: 15px;
+            margin-bottom: 20px;
+        }
+        .action-buttons button {
+            font-size: 20px;
+            padding: 12px 24px;
+            margin-right: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        /* 觸控友好的按鈕尺寸 */
+        button {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        input[type="text"],
+        input[type="number"] {
+            min-height: 44px;
+        }
+        /* 漂亮的標題樣式 */
+        .section-title {
+            color: #0d6efd;
+            border-left: 4px solid #0d6efd;
+            padding-left: 10px;
+            margin-bottom: 15px;
+        }
+        /* 添加按鈕點擊效果 */
+        .btn-touch {
+            transition: transform 0.1s;
+        }
+        .btn-touch:active {
+            transform: scale(0.97);
         }
     </style>
 </head>
 <body>
-    <div class="container" id="app">
-        
-        <div class="form-group">
-            <label for="user">填寫人：</label>
-            <select id="user" v-model="selectedUser" @change="onUserSelect">
-                <option value="">請選擇填寫人</option>
-                <option v-for="user in users" :key="user.id" :value="user.id">
-                    {{ user.name }}
-                </option>
-            </select>
+    <div id="app" class="container-fluid">
+        <!-- 全螢幕按鈕 -->
+        <button @click="toggleFullScreen" class="btn btn-outline-secondary fullscreen-btn btn-touch">
+            <i class="bi" :class="isFullScreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'"></i>
+            {{ isFullScreen ? '退出全螢幕' : '全螢幕模式' }}
+        </button>
+
+        <!-- 檢驗人選擇區域 -->
+        <div class="inspector-selection" v-if="!inspectorSelected">
+            <h2 class="section-title">請選擇檢驗人員</h2>
+            <div class="inspector-option" v-for="inspector in inspectors" :key="inspector.id">
+                <label>
+                    <input type="radio" name="inspector" :value="inspector.id" v-model="selectedInspector" class="inspector-checkbox">
+                    {{ inspector.name }}
+                </label>
+            </div>
+            <button class="btn btn-primary mt-3 btn-touch" @click="confirmInspector" :disabled="!selectedInspector">確認</button>
         </div>
 
-        <div class="form-group">
-            <label for="barcode">條碼編號：</label>
-            <input type="text" id="barcode" v-model="barcode" @input="onBarcodeInput"
-                   placeholder="請掃描或輸入條碼" :disabled="!selectedUser">
+        <!-- 條碼輸入區域 -->
+        <div class="barcode-section" v-if="inspectorSelected && !productInfo">
+            <h2 class="section-title">請掃描或輸入條碼</h2>
+            <div class="input-group">
+                <input type="text" id="barcode" v-model="barcode" class="form-control" placeholder="條碼編號" @keyup.enter="fetchProductInfo">
+                <button class="btn btn-primary btn-touch" @click="fetchProductInfo">查詢</button>
+            </div>
         </div>
 
-        <div>
-            <h3>產品資訊：</h3>
-            <p>產品名稱：{{ productInfo ? productInfo.product_name : '尚未掃描條碼' }}</p>
-            <p>規格：{{ productInfo ? productInfo.specifications : '尚未掃描條碼' }}</p>
+        <!-- 產品資訊顯示區域 -->
+        <div class="product-info" v-if="productInfo">
+            <h2 class="section-title">產品資訊</h2>
+            <table class="table">
+                <tr>
+                    <th>條碼編號:</th>
+                    <td>{{ barcode }}</td>
+                </tr>
+                <tr>
+                    <th>工單號:</th>
+                    <td>{{ productInfo.工單號 }}</td>
+                </tr>
+                <tr>
+                    <th>品名:</th>
+                    <td>{{ productInfo.品名 }}</td>
+                </tr>
+                <tr>
+                    <th>料號:</th>
+                    <td>{{ productInfo.料號 || '無資料' }}</td>
+                </tr>
+                <tr>
+                    <th>機台:</th>
+                    <td>{{ productInfo.機台 }}</td>
+                </tr>
+                <tr>
+                    <th>箱數:</th>
+                    <td>{{ productInfo.箱數 }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 重量控制區域 -->
+        <div class="weight-controls" v-if="productInfo">
+            <h2 class="section-title">重量資訊</h2>
             
             <div class="weight-display">
-                目前重量：{{ currentWeight }} kg
+                {{ displayWeight }} kg
             </div>
+            
+            <div class="d-grid gap-2">
+                <button @click="getWeight" class="btn btn-success btn-lg btn-touch">
+                    <i class="bi bi-arrow-repeat"></i> 獲取重量
+                </button>
+            </div>
+            
+            <div class="weight-input">
+                <label for="weight" class="form-label">手動調整重量 (kg)</label>
+                <input type="number" id="weight" v-model="weight" class="form-control" step="0.001" min="0">
+            </div>
+            
+            <div class="unit-weight-input">
+                <label for="unitWeight" class="form-label">單重 (kg / 個)</label>
+                <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0">
+            </div>
+        </div>
 
-            <button class="submit-btn" 
-                    @click="submitData" 
-                    :disabled="!canSubmit">
-                送出資料
-            </button>
+        <!-- 按鈕區域 -->
+        <div class="action-buttons" v-if="productInfo">
+            <div class="d-grid gap-2">
+                <button @click="submitData" class="btn btn-primary btn-lg btn-touch" :disabled="!canSubmit">
+                    <i class="bi bi-check-circle"></i> 送出資料
+                </button>
+                <button @click="resetForm" class="btn btn-secondary btn-touch">
+                    <i class="bi bi-arrow-clockwise"></i> 重置
+                </button>
+            </div>
+        </div>
+
+        <!-- 訊息顯示區域 -->
+        <div class="alert" :class="messageType" v-if="message" role="alert">
+            {{ message }}
         </div>
     </div>
 
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    
+    <!-- Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.20/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
     <script>
-        new Vue({
-            el: '#app',
-            data: {
-                users: [],
-                selectedUser: '',
-                barcode: '',
-                productInfo: null,
-                currentWeight: 0,
-                weightInterval: null,
-                canSubmit: false
-            },
-            methods: {
-                fetchUsers() {
-                    axios.get('api.php?action=getUsers')
-                        .then(response => {
-                            this.users = response.data;
-                        })
-                        .catch(error => {
-                            console.error('Error fetching users:', error);
-                            alert('獲取使用者資料失敗');
-                        });
-                },
-                onUserSelect() {
-                    this.barcode = '';
-                    this.productInfo = null;
-                    this.stopWeightMonitoring();
-                },
-                onBarcodeInput() {
-                    if (this.barcode.length >= 5) {  // 假設條碼最少5位
-                        this.fetchProductInfo();
+        const { createApp, ref, computed, onMounted } = Vue;
+        
+        createApp({
+            setup() {
+                // 檢驗人員清單
+                const inspectors = ref([
+                    { id: 1, name: '王曉明' },
+                    { id: 2, name: '王大明' },
+                    { id: 3, name: '李曉慧' }
+                ]);
+                
+                // 狀態變數
+                const selectedInspector = ref('');
+                const inspectorSelected = ref(false);
+                const barcode = ref('');
+                const productInfo = ref(null);
+                const weight = ref(0);
+                const unitWeight = ref(0);
+                const message = ref('');
+                const messageType = ref('');
+                const isFullScreen = ref(false);
+                const weightInterval = ref(null);
+                
+                // 計算屬性
+                const displayWeight = computed(() => parseFloat(weight.value).toFixed(3));
+                const canSubmit = computed(() => 
+                    selectedInspector.value && 
+                    barcode.value && 
+                    productInfo.value && 
+                    parseFloat(weight.value) > 0 && 
+                    parseFloat(unitWeight.value) > 0
+                );
+                
+                // 確認檢驗人員
+                const confirmInspector = () => {
+                    if (selectedInspector.value) {
+                        inspectorSelected.value = true;
                     }
-                },
-                fetchProductInfo() {
-                    axios.get(`api.php?action=getProduct&barcode=${this.barcode}`)
-                        .then(response => {
-                            this.productInfo = response.data;
-                            this.startWeightMonitoring();
-                        })
-                        .catch(error => {
-                            console.error('Error fetching product:', error);
-                            alert('獲取產品資料失敗');
-                        });
-                },
-                startWeightMonitoring() {
-                    this.stopWeightMonitoring();
-                    this.weightInterval = setInterval(() => {
-                        axios.get('api.php?action=getWeight')
-                            .then(response => {
-                                this.currentWeight = response.data.weight;
-                                this.canSubmit = true;
-                            })
-                            .catch(error => {
-                                console.error('Error getting weight:', error);
-                            });
-                    }, 500);  // 每500ms更新一次
-                },
-                stopWeightMonitoring() {
-                    if (this.weightInterval) {
-                        clearInterval(this.weightInterval);
-                        this.weightInterval = null;
+                };
+                
+                // 獲取產品資訊
+                const fetchProductInfo = async () => {
+                    if (!barcode.value) {
+                        showMessage('請輸入條碼編號', 'alert-warning');
+                        return;
                     }
-                },
-                submitData() {
-                    const data = {
-                        user_id: this.selectedUser,
-                        barcode: this.barcode,
-                        weight: this.currentWeight
-                    };
-
-                    axios.post('api.php?action=saveRecord', data)
-                        .then(response => {
-                            alert('資料儲存成功！');
-                            this.resetForm();
-                        })
-                        .catch(error => {
-                            console.error('Error saving data:', error);
-                            alert('資料儲存失敗');
+                    
+                    try {
+                        const response = await axios.get(`backend/weight.php?action=getProductInfo&barcode=${barcode.value}`);
+                        
+                        if (response.data.success) {
+                            productInfo.value = response.data.data;
+                            showMessage('成功獲取產品資訊', 'alert-success');
+                        } else {
+                            showMessage(response.data.message || '查無此條碼', 'alert-danger');
+                        }
+                    } catch (error) {
+                        console.error('獲取產品資訊錯誤:', error);
+                        showMessage('系統錯誤，請稍後再試', 'alert-danger');
+                    }
+                };
+                
+                // 獲取重量
+                const getWeight = async () => {
+                    try {
+                        const response = await axios.get('backend/weight.php?action=getWeight');
+                        
+                        if (response.data.success) {
+                            weight.value = response.data.weight;
+                            showMessage('成功獲取重量', 'alert-success');
+                        } else {
+                            showMessage(response.data.message || '無法獲取重量', 'alert-warning');
+                        }
+                    } catch (error) {
+                        console.error('獲取重量錯誤:', error);
+                        showMessage('獲取重量失敗，請手動輸入', 'alert-warning');
+                    }
+                };
+                
+                // 提交資料
+                const submitData = async () => {
+                    if (!canSubmit.value) {
+                        showMessage('請填寫所有必要資訊', 'alert-warning');
+                        return;
+                    }
+                    
+                    try {
+                        const data = {
+                            barcode: barcode.value,
+                            inspector: selectedInspector.value,
+                            weight: weight.value,
+                            unitWeight: unitWeight.value
+                        };
+                        
+                        const response = await axios.post('backend/weight.php?action=saveData', data);
+                        
+                        if (response.data.success) {
+                            showMessage('資料儲存成功', 'alert-success');
+                            setTimeout(() => {
+                                resetForm();
+                            }, 2000);
+                        } else {
+                            showMessage(response.data.message || '儲存失敗', 'alert-danger');
+                        }
+                    } catch (error) {
+                        console.error('儲存資料錯誤:', error);
+                        showMessage('系統錯誤，請稍後再試', 'alert-danger');
+                    }
+                };
+                
+                // 重置表單
+                const resetForm = () => {
+                    barcode.value = '';
+                    productInfo.value = null;
+                    weight.value = 0;
+                    unitWeight.value = 0;
+                };
+                
+                // 全螢幕切換
+                const toggleFullScreen = () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(e => {
+                            showMessage('無法進入全螢幕模式', 'alert-warning');
                         });
-                },
-                resetForm() {
-                    this.barcode = '';
-                    this.productInfo = null;
-                    this.currentWeight = 0;
-                    this.canSubmit = false;
-                    this.stopWeightMonitoring();
-                }
-            },
-            mounted() {
-                this.fetchUsers();
-            },
-            beforeDestroy() {
-                this.stopWeightMonitoring();
+                        isFullScreen.value = true;
+                    } else {
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                            isFullScreen.value = false;
+                        }
+                    }
+                };
+                
+                // 顯示訊息
+                const showMessage = (msg, type) => {
+                    message.value = msg;
+                    messageType.value = type;
+                    
+                    // 3秒後自動清除訊息
+                    setTimeout(() => {
+                        message.value = '';
+                        messageType.value = '';
+                    }, 3000);
+                };
+                
+                // 生命週期鉤子
+                onMounted(() => {
+                    // 頁面載入後自動聚焦到條碼輸入框
+                    document.addEventListener('keydown', (e) => {
+                        // 如果用戶在輸入框外按下數字或字母，自動聚焦到條碼輸入框
+                        const tag = document.activeElement.tagName.toLowerCase();
+                        if (tag !== 'input' && tag !== 'textarea' && e.key.length === 1) {
+                            const barcodeInput = document.getElementById('barcode');
+                            if (barcodeInput) {
+                                barcodeInput.focus();
+                            }
+                        }
+                    });
+                });
+                
+                return {
+                    inspectors,
+                    selectedInspector,
+                    inspectorSelected,
+                    barcode,
+                    productInfo,
+                    weight,
+                    unitWeight,
+                    message,
+                    messageType,
+                    isFullScreen,
+                    displayWeight,
+                    canSubmit,
+                    confirmInspector,
+                    fetchProductInfo,
+                    getWeight,
+                    submitData,
+                    resetForm,
+                    toggleFullScreen
+                };
             }
-        });
+        }).mount('#app');
     </script>
 </body>
 </html>
