@@ -4,6 +4,10 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// 定義 Python 執行環境和腳本的絕對路徑
+define('PYTHON_PATH', 'D:/我的文件/Documents/OptimizationFlow-Vue/.venv/Scripts/python.exe');
+define('BARCODE_SCRIPT_PATH', 'D:/我的文件/Documents/OptimizationFlow-Vue/barcode.py');
+
 // 檢查請求的動作類型
 $action = $_GET['action'] ?? '';
 
@@ -403,10 +407,12 @@ function printBarcode() {
         // 10. 提交資料庫變更
         $pdo->commit();
         
-        // 11. 循環執行列印
+        // 11. 循環執行列印 - 使用絕對路徑
         $printErrors = [];
         foreach ($barcodeIds as $barcode) {
-            $command = "python.exe ../barcode.py " . escapeshellarg($barcode['id']) . " " . 
+            // 使用預定義的常量設置完整的 Python 路徑和腳本路徑
+            $command = '"' . PYTHON_PATH . '" "' . BARCODE_SCRIPT_PATH . '" ' . 
+                      escapeshellarg($barcode['id']) . " " . 
                       escapeshellarg($workOrder) . " " . 
                       escapeshellarg($productName) . " " . 
                       escapeshellarg($operator) . " " . 
@@ -414,10 +420,15 @@ function printBarcode() {
                       escapeshellarg($barcode['boxNumber']) . " " . 
                       escapeshellarg($shift);
             
+            // 記錄執行的命令以便調試
+            error_log('Executing command: ' . $command);
+            
+            // 執行命令
             exec($command, $output, $returnVar);
             
             if ($returnVar !== 0) {
                 $printErrors[] = "箱號 {$barcode['boxNumber']} 列印失敗: " . implode("\n", $output);
+                error_log('Print error: ' . implode("\n", $output));
             }
         }
         
@@ -471,8 +482,9 @@ function reprintBarcode() {
             return;
         }
         
-        // 呼叫 Python 腳本執行列印
-        $command = "python.exe ../barcode.py " . escapeshellarg($barcodeId) . " " . 
+        // 使用絕對路徑執行 Python 腳本
+        $command = '"' . PYTHON_PATH . '" "' . BARCODE_SCRIPT_PATH . '" ' . 
+                  escapeshellarg($barcodeId) . " " . 
                   escapeshellarg($workOrder) . " " . 
                   escapeshellarg($productName) . " " . 
                   escapeshellarg($operator) . " " . 
@@ -480,9 +492,13 @@ function reprintBarcode() {
                   escapeshellarg($boxNumber) . " " . 
                   escapeshellarg($shift);
         
+        // 記錄執行的命令以便調試
+        error_log('Executing reprint command: ' . $command);
+        
         exec($command, $output, $returnVar);
                 
         if ($returnVar !== 0) {
+            error_log('Reprint error: ' . implode("\n", $output));
             echo json_encode(['success' => false, 'error' => '重印失敗: ' . implode("\n", $output)]);
             return;
         }
