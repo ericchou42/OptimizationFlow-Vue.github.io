@@ -36,7 +36,7 @@ def print_zebra_label(data):
     try:
         # 定義標籤參數
         # XY軸位置
-        x_position = 30
+        x_position = 200
         x_position_right = 630
         y_position = 30
 
@@ -55,10 +55,25 @@ def print_zebra_label(data):
         # 添加工單號條碼尺寸
         zpl_command += f"^BY{module_width}"
 
+        # 生
+        zpl_command += f"^FO{30},{100}"
+        zpl_command += "^A@N,80,80,E:ARIAL.TTF"
+        zpl_command += f"^FD生^FS"
+
+        # 產
+        zpl_command += f"^FO{30},{200}"
+        zpl_command += "^A@N,80,80,E:ARIAL.TTF"
+        zpl_command += f"^FD產^FS"
+
+        # 部
+        zpl_command += f"^FO{30},{300}"
+        zpl_command += "^A@N,80,80,E:ARIAL.TTF"
+        zpl_command += f"^FD部^FS"
+
         # 入庫日期
         zpl_command += f"^FO{x_position},{y_position}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD日期:3/11^FS"
+        zpl_command += f"^FD日期:2025/03/17^FS"
 
         # 品名
         zpl_command += f"^FO{x_position},{y_position + 100}"
@@ -75,34 +90,39 @@ def print_zebra_label(data):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD機台: {data['機台']}^FS"
 
-        # 人員
-        zpl_command += f"^FO{x_position},{y_position + 400}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD人員:王小明^FS"
-
         # 後續單位
-        zpl_command += f"^FO{x_position},{y_position + 500}"
+        zpl_command += f"^FO{x_position},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD後續單位:電^FS"
 
+        # 人員
+        zpl_command += f"^FO{x_position},{y_position + 500}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD人員:王小明^FS"
+
         # 數量
-        zpl_command += f"^FO{x_position_right},{y_position + 100}"
+        zpl_command += f"^FO{x_position_right},{y_position + 300}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD數量:2074^FS"
 
         # 淨重
-        zpl_command += f"^FO{x_position_right},{y_position + 200}"
+        zpl_command += f"^FO{x_position_right},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD淨重:2.42^FS"
 
-        # 異常品
-        zpl_command += f"^FO{x_position_right},{y_position + 300}"
+        # 班別
+        zpl_command += f"^FO{x_position_right},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD[異常品]^FS"
+        zpl_command += f"^FD班別:夜^FS"
+
+        # 異常品
+        zpl_command += f"^FO{750},{y_position}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD[異常]^FS"
 
         # HSF
-        zpl_command += f"^FO{x_position_right},{y_position + 400}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FO{30},{y_position + 530}"
+        zpl_command += "^A@N,30,30,E:ARIAL.TTF"
         zpl_command += f"^FD[HSF]^FS"
 
         # 結束ZPL命令
@@ -146,9 +166,7 @@ def main():
             print("-" * 50)
             
             # 詢問是否要打印標籤
-            print_option = input("\n是否要打印標籤? (y/n): ")
-            if print_option.lower() == 'y':
-                print_zebra_label(data)
+            print_zebra_label(data)
         else:
             print(f"找不到工單號為 '{work_order_number}' 的資料")
             

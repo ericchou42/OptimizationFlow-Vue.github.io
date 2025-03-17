@@ -346,7 +346,7 @@ $updateStmt->execute([$boxCount, $car]);
         foreach ($barcodeIds as $index => $barcodeId) {
             $boxNumber = str_pad($index + 1, 2, '0', STR_PAD_LEFT);
             
-            $command = "python ../barcode.py " . escapeshellarg($barcodeId) . " " . 
+            $command = "python.exe ../barcode.py " . escapeshellarg($barcodeId) . " " . 
                       escapeshellarg($workOrder) . " " . 
                       escapeshellarg($productName) . " " . 
                       escapeshellarg($operator) . " " . 
@@ -411,7 +411,7 @@ function reprintBarcode() {
         }
         
         // 呼叫 Python 腳本執行列印 (加入日期參數)
-        $command = "python ../barcode.py " . escapeshellarg($barcodeId) . " " . 
+        $command = "python.exe ../barcode.py " . escapeshellarg($barcodeId) . " " . 
                   escapeshellarg($workOrder) . " " . 
                   escapeshellarg($productName) . " " . 
                   escapeshellarg($operator) . " " . 
