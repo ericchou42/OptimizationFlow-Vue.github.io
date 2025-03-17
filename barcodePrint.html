@@ -132,6 +132,23 @@
             background-color: #f8d7da;
             transition: background-color 0.5s;
         }
+        
+        /* 除錯資訊 */
+        .debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            display: none;
+        }
+        
+        .debug-toggle {
+            margin-top: 20px;
+            cursor: pointer;
+            color: #6c757d;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -160,7 +177,7 @@
                 <!-- 表格區域，使用容器允許水平滾動 -->
                 <div class="table-container">
                     <!-- 重新設計的主表格，使用table-layout: auto自動調整寬度 -->
-                    <table class="main-table table table-bordered">
+                    <table v-if="filteredData.length > 0" class="main-table table table-bordered">
                         <!-- 共用表頭 -->
                         <thead>
                             <tr class="shared-header">
@@ -183,8 +200,8 @@
                                     <td class="workorder-cell">{{ item.currentWorkOrder }}</td>
                                     <td>{{ item.productName }}</td>
                                     <td>
-                                        <select v-model="item.reprintBoxCount" class="form-control">
-                                            <option v-for="n in parseInt(item.boxCount || '1')" :key="n" :value="n.toString().padStart(2, '0')">
+                                        <select v-model="item.boxCount" class="form-control">
+                                            <option v-for="n in getBoxOptions(item)" :key="n" :value="n.toString().padStart(2, '0')">
                                                 {{ n.toString().padStart(2, '0') }}
                                             </option>
                                         </select>
@@ -201,13 +218,13 @@
                                     <td>
                                         <button @click="printBarcode(item)" 
                                                 class="btn btn-sm btn-primary"
-                                                :disabled="item.isPrinted">
+                                                :disabled="parseInt(item.boxCount) >= 10 || parseInt(item.currentBoxCount) >= 9">
                                             列印
                                         </button>
                                     </td>
                                     <td>
                                         <select v-model="item.reprintBoxCount" class="form-control">
-                                            <option v-for="n in parseInt(item.boxCount || '1')" :key="n" :value="n.toString().padStart(2, '0')">
+                                            <option v-for="n in parseInt(item.currentBoxCount || '1')" :key="n" :value="n.toString().padStart(2, '0')">
                                                 {{ n.toString().padStart(2, '0') }}
                                             </option>
                                         </select>
@@ -223,7 +240,23 @@
                             </template>
                         </tbody>
                     </table>
+                    <!-- 如果沒有資料 -->
+                    <div v-else class="alert alert-info">
+                        沒有狀態為 'D' 的機台資料。請檢查資料庫中是否有機台狀態設定為 'D'。
+                    </div>
                 </div>
+            </div>
+            
+            <!-- 除錯資訊切換按鈕 -->
+            <div class="debug-toggle" @click="toggleDebugInfo">{{ showDebugInfo ? '隱藏除錯資訊' : '顯示除錯資訊' }}</div>
+            
+            <!-- 除錯資訊區域 -->
+            <div class="debug-info" v-if="showDebugInfo" style="display: block;">
+                <h4>API 回應數據</h4>
+                <pre>{{ debugApiResponse }}</pre>
+                
+                <h4>資料處理後狀態</h4>
+                <pre>{{ JSON.stringify(filteredData, null, 2) }}</pre>
             </div>
         </div>
     </div>
@@ -246,6 +279,23 @@
                 const machineStatuses = ref([]);
                 const message = ref('');
                 const messageType = ref('');
+                const debugApiResponse = ref('');
+                const showDebugInfo = ref(false);
+                
+                // 除錯資訊切換
+                const toggleDebugInfo = () => {
+                    showDebugInfo.value = !showDebugInfo.value;
+                };
+                
+// 處理箱數選項的函數
+const getBoxOptions = (item) => {
+    const currentBox = parseInt(item.currentBoxCount || '0');
+    const maxOptions = 9;
+    // 如果當前箱數已經是9或更大，則沒有選項可選
+    if (currentBox >= maxOptions) return [];
+    // 從當前箱數+1開始，到9結束
+    return Array.from({ length: maxOptions - currentBox }, (_, i) => currentBox + i + 1);
+};
                 
 // 檢查條碼是否已被列印過
 const isPrinted = async (car, workOrder) => {
@@ -279,7 +329,7 @@ const printBarcode = async (item) => {
             car: item.car,
             workOrder: item.currentWorkOrder,
             productName: item.productName,
-            boxCount: item.boxCount || '01',
+            boxCount: item.boxCount,
             operator: item.operator,
             shift: item.shift || '日'
         });
@@ -288,6 +338,12 @@ const printBarcode = async (item) => {
             showMessage('列印成功', 'alert-success');
             // 更新本地狀態，標記為已列印
             item.isPrinted = true;
+            // 更新當前箱數
+            item.currentBoxCount = item.boxCount;
+            // 重新獲取可選的箱數選項
+            if (parseInt(item.currentBoxCount) >= 9) {
+                item.boxCount = '09';
+            }
         } else {
             showMessage(printResponse.data.error || '列印失敗', 'alert-danger');
         }
@@ -311,7 +367,7 @@ const reprintBarcode = async (item) => {
             productName: item.productName,
             boxNumber: item.reprintBoxCount || '01',
             operator: item.operator || '',
-            shift: item.shift || '早'
+            shift: item.shift || '日'
         });
         
         if (response.data.success) {
@@ -327,39 +383,85 @@ const reprintBarcode = async (item) => {
 
 // 搜尋過濾功能
 const filteredData = computed(() => {
+    if (!Array.isArray(data.value)) return [];
     return data.value.filter(item => item.currentStatus === 'D');
 });
                 
-                // 判斷是否需要高亮顯示
-                const isHighlighted = (item, entry) => {
-                    if (!searchTerm.value) return false;
-                    
-                    const term = searchTerm.value.toLowerCase();
-                    return item.car.toLowerCase().includes(term) || 
-                           (entry.workOrder && entry.workOrder.toLowerCase().includes(term)) ||
-                           (entry.actualWorkOrder && entry.actualWorkOrder.toLowerCase().includes(term)) ||
-                           (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
-                };
+// 判斷是否需要高亮顯示
+const isHighlighted = (item, entry) => {
+    if (!searchTerm.value) return false;
+    
+    const term = searchTerm.value.toLowerCase();
+    return item.car.toLowerCase().includes(term) || 
+            (entry.workOrder && entry.workOrder.toLowerCase().includes(term)) ||
+            (entry.actualWorkOrder && entry.actualWorkOrder.toLowerCase().includes(term)) ||
+            (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
+};
 
-                const fetchData = async () => {
+const fetchData = async () => {
     try {
         loading.value = true;
-        const response = await axios.get('./backend/barcodePrint.php');
+        
+        // 傳遞一個時間戳參數避免緩存
+        const timestamp = new Date().getTime();
+        const response = await axios.get(`./backend/barcodePrint.php?t=${timestamp}`);
+        
+        // 保存原始 API 響應用於除錯
+        debugApiResponse.value = JSON.stringify(response.data, null, 2);
+        console.log('API 回應數據:', response.data);
         
         if (response.data.error) {
             error.value = response.data.error;
+            return;
+        }
+        
+        // 確認回應是否為有效的數組
+        if (!Array.isArray(response.data)) {
+            let rawData;
+            try {
+                // 嘗試解析可能是字符串的 JSON
+                if (typeof response.data === 'string') {
+                    rawData = JSON.parse(response.data);
+                    if (Array.isArray(rawData)) {
+                        // 成功解析為數組
+                        console.log('成功解析字符串為數組');
+                    } else {
+                        error.value = '伺服器返回的數據不是數組格式';
+                        return;
+                    }
+                } else {
+                    error.value = '伺服器返回的數據格式不正確';
+                    return;
+                }
+            } catch (e) {
+                console.error('解析響應失敗:', e);
+                error.value = '伺服器返回的數據格式無法解析';
+                return;
+            }
+        }
+        
+        // 處理有效的數組數據
+        const validData = Array.isArray(response.data) ? response.data : [];
+        
+        if (validData.length === 0) {
+            console.log('警告: 伺服器返回空數組');
+            data.value = [];
         } else {
             // 確保每個項目都有正確的 currentStatus
-            data.value = response.data.map(item => {
+            data.value = validData.map(item => {
+                const currentBoxCount = parseInt(item.boxCount || '0');
+                // 如果箱數已經達到9，不提供更多選項
+                const nextBoxCount = currentBoxCount >= 9 ? '09' : (currentBoxCount + 1).toString().padStart(2, '0');
                 
                 return {
                     ...item,
-                    currentStatus: item.currentStatus || 'B', // 如果後端沒有提供，則使用默認值
-                    isPrinted: false, // 初始化為未列印
-                    reprintBoxCount: '01', // 初始化重印箱數
-                    // 根據從資料庫獲取的班別或當前時間設定班別
+                    currentStatus: item.currentStatus || 'B',
+                    isPrinted: false,
+                    currentBoxCount: item.boxCount || '0', // 儲存原始箱數
+                    boxCount: nextBoxCount, // 預設選擇下一個箱數
+                    reprintBoxCount: '01',
+                    // 根據時間設定班別：12點前為夜班，12點後為日班
                     shift: item.shift || (new Date().getHours() < 12 ? '夜' : '日'),
-                    // 保留從資料庫中獲取的僱車人員
                     operator: item.operator || ''
                 };
             });
@@ -370,15 +472,27 @@ const filteredData = computed(() => {
                     item.isPrinted = await isPrinted(item.car, item.currentWorkOrder);
                 }
             }
-            
-            // 在數據加載後，添加延遲以確保表格已渲染
-            setTimeout(() => {
-                adjustTableColumns();
-                initializeSelectDropdowns();
-            }, 100);
         }
+        
+        // 在數據加載後，添加延遲以確保表格已渲染
+        setTimeout(() => {
+            adjustTableColumns();
+            initializeSelectDropdowns();
+        }, 100);
     } catch (err) {
+        console.error('獲取數據錯誤:', err);
         error.value = `獲取數據失敗: ${err.message}`;
+        
+        // 嘗試記錄響應內容以便調試
+        if (err.response) {
+            debugApiResponse.value = JSON.stringify({
+                status: err.response.status,
+                headers: err.response.headers,
+                data: err.response.data
+            }, null, 2);
+        } else {
+            debugApiResponse.value = `沒有響應對象: ${err.message}`;
+        }
     } finally {
         loading.value = false;
     }
@@ -472,37 +586,31 @@ const saveWorkOrder = async (car) => {
     }
 };
                 
-                // 顯示訊息
-                const showMessage = (msg, type) => {
-                    message.value = msg;
-                    messageType.value = type;
-                    
-                    // 3秒後自動清除訊息
-                    setTimeout(() => {
-                        message.value = '';
-                        messageType.value = '';
-                    }, 3000);
-                };
+// 顯示訊息
+const showMessage = (msg, type) => {
+    message.value = msg;
+    messageType.value = type;
+    
+    // 3秒後自動清除訊息
+    setTimeout(() => {
+        message.value = '';
+        messageType.value = '';
+    }, 3000);
+};
                 
-                // 調整表格列寬以適應內容
-                const adjustTableColumns = () => {
-                    // 這個函數使用純JS來輔助Vue實現最佳的表格寬度
-                    // 當數據載入後，此函數會自動執行
-                    // 注意：表格已經通過CSS的table-layout: auto實現了大部分自動調整
-                };
+// 調整表格列寬以適應內容
+const adjustTableColumns = () => {
+    // 這個函數使用純JS來輔助Vue實現最佳的表格寬度
+    // 當數據載入後，此函數會自動執行
+    // 注意：表格已經通過CSS的table-layout: auto實現了大部分自動調整
+};
                 
 // 頁面載入時獲取數據
 onMounted(() => {
     fetchMachineStatuses().then(() => {
-        fetchData().then(() => {
-// 初始化每個機台的箱數、僱車
-data.value.forEach(item => {
-    item.boxCount = item.boxCount || '01';
-    item.reprintBoxCount = '01';
-    item.operator = item.operator || '';
-    // 班別已在 fetchData 中設定，從生產紀錄表獲取
-});
-        });
+        fetchData();
+    }).catch(err => {
+        error.value = `初始化失敗: ${err.message}`;
     });
     
     // 添加窗口大小變化監聽器
@@ -523,7 +631,11 @@ return {
     machineStatuses,
     workOrders,
     printBarcode,
-    reprintBarcode
+    reprintBarcode,
+    getBoxOptions,
+    debugApiResponse,
+    showDebugInfo,
+    toggleDebugInfo
 };
             }
         });
