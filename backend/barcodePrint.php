@@ -63,10 +63,8 @@ function getCarData() {
         // 調試信息：記錄函數執行開始
         error_log('getCarData 函數開始執行');
 
-        // 1. 獲取機台看板的基礎數據
-        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, md.箱數 as 箱數, ms.狀態 as 狀態名稱, 
-                (SELECT br.顧車 FROM 生產紀錄表 br WHERE br.機台 = md.機台 AND br.工單號 = md.工單號 ORDER BY br.建立時間 DESC LIMIT 1) as 顧車,
-                (SELECT br.班別 FROM 生產紀錄表 br WHERE br.機台 = md.機台 AND br.工單號 = md.工單號 ORDER BY br.建立時間 DESC LIMIT 1) as 班別
+        // 1. 獲取機台看板的基礎數據 - 移除顧車和班別的子查詢
+        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, md.箱數 as 箱數, ms.狀態 as 狀態名稱
                 FROM 機台看板 md 
                 LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
                 WHERE md.狀態 = 'D'  /* 僅選取狀態為D的記錄 */
@@ -122,7 +120,7 @@ function getCarData() {
             ];
         }
 
-        // 整理數據結構
+        // 整理數據結構 - 移除從數據庫獲取雇車和班別
         $result = [];
         foreach ($dashboardData as $dashboard) {
             $carId = $dashboard['車台號'];
@@ -142,8 +140,9 @@ function getCarData() {
                 'productName' => $productName,
                 'drawingInfo' => $drawingInfo,
                 'boxCount' => $boxCountStr,
-                'operator' => $dashboard['顧車'] ?: '',
-                'shift' => $dashboard['班別'] ?: (date('H') < 12 ? '夜' : '日'),
+                // 移除從數據庫獲取雇車和班別，前端會設置
+                'operator' => '',
+                'shift' => '',
                 'scheduledOrders' => []
             ];
         }

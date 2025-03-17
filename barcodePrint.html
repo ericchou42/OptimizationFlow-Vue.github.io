@@ -149,11 +149,23 @@
             color: #6c757d;
             text-decoration: underline;
         }
+        
+        /* 當前時間顯示 */
+        .current-time {
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="container-fluid">
+            <!-- 當前時間顯示 -->
+            <div class="current-time">
+                當前時間: {{ currentTimeDisplay }} (預設班別: {{ currentHour < 12 ? '夜班' : '日班' }})
+            </div>
+            
             <!-- 載入中狀態顯示 -->
             <div v-if="loading" class="loading">
                 <div class="spinner-border text-primary" role="status">
@@ -282,6 +294,17 @@
                 const debugApiResponse = ref('');
                 const showDebugInfo = ref(false);
                 
+                // 當前時間相關
+                const currentHour = ref(new Date().getHours());
+                const currentTimeDisplay = ref(new Date().toLocaleTimeString());
+                
+                // 每分鐘更新時間
+                setInterval(() => {
+                    const now = new Date();
+                    currentHour.value = now.getHours();
+                    currentTimeDisplay.value = now.toLocaleTimeString();
+                }, 60000);
+                
                 // 除錯資訊切換
                 const toggleDebugInfo = () => {
                     showDebugInfo.value = !showDebugInfo.value;
@@ -398,6 +421,7 @@ const isHighlighted = (item, entry) => {
             (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
 };
 
+// 修正過的 fetchData 函數，確保正確的班別預設邏輯
 const fetchData = async () => {
     try {
         loading.value = true;
@@ -409,6 +433,14 @@ const fetchData = async () => {
         // 保存原始 API 響應用於除錯
         debugApiResponse.value = JSON.stringify(response.data, null, 2);
         console.log('API 回應數據:', response.data);
+        
+        // 獲取當前小時，用於設置班別預設值
+        const now = new Date();
+        const hour = now.getHours();
+        console.log('當前時間小時: ' + hour);
+        // 中午12點以前夜班，以後日班
+        const defaultShift = hour < 12 ? '夜' : '日';
+        console.log('預設班別: ' + defaultShift);
         
         if (response.data.error) {
             error.value = response.data.error;
@@ -460,9 +492,10 @@ const fetchData = async () => {
                     currentBoxCount: item.boxCount || '0', // 儲存原始箱數
                     boxCount: nextBoxCount, // 預設選擇下一個箱數
                     reprintBoxCount: '01',
-                    // 根據時間設定班別：12點前為夜班，12點後為日班
-                    shift: item.shift || (new Date().getHours() < 12 ? '夜' : '日'),
-                    operator: item.operator || ''
+                    // 正確設置班別預設值，使用剛剛計算的 defaultShift
+                    shift: defaultShift,
+                    // 雇車默認為空，由用戶填寫
+                    operator: ''
                 };
             });
             
@@ -607,6 +640,11 @@ const adjustTableColumns = () => {
                 
 // 頁面載入時獲取數據
 onMounted(() => {
+    // 獲取並更新當前時間
+    const now = new Date();
+    currentHour.value = now.getHours();
+    currentTimeDisplay.value = now.toLocaleTimeString();
+    
     fetchMachineStatuses().then(() => {
         fetchData();
     }).catch(err => {
@@ -617,7 +655,7 @@ onMounted(() => {
     window.addEventListener('resize', adjustTableColumns);
 });
 
-// 修改 return 部分，添加新的函數
+// 修改 return 部分，添加新的函數和變數
 return {
     data,
     loading,
@@ -635,7 +673,9 @@ return {
     getBoxOptions,
     debugApiResponse,
     showDebugInfo,
-    toggleDebugInfo
+    toggleDebugInfo,
+    currentHour,
+    currentTimeDisplay
 };
             }
         });
