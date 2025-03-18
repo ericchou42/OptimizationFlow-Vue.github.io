@@ -117,15 +117,15 @@ def print_zebra_label(data):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD人員:{data['檢驗人']}^FS"
 
-        # 重量
+        # 淨量
         zpl_command += f"^FO{x_position_right},{y_position + 300}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD重量:{data['重量']}^FS"
+        zpl_command += f"^FD淨重:{data['重量']}^FS"
 
-        # 淨重（單重）
+        # 數量
         zpl_command += f"^FO{x_position_right},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD單重:{data['單重']}^FS"
+        zpl_command += f"^FD數量:{data['數量']}^FS"
 
         # 班別
         zpl_command += f"^FO{x_position_right},{y_position + 500}"
@@ -187,7 +187,7 @@ def main():
             '顧車': operator,
             '機台': machine,
             '重量': weight,
-            '單重': unit_weight,
+            '數量': unit_weight,
             '檢驗人': inspector,
             '班別': shift
         }

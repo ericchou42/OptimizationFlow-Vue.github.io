@@ -46,7 +46,10 @@ def get_work_order_data(connection, work_order_number):
 def print_zebra_label(data):
     try:
         logging.info(f"準備列印標籤: {data}")
-        
+
+        # 獲取當前日期
+        current_date = datetime.datetime.now().strftime("%Y/%m/%d")
+
         # 定義標籤參數
         # XY軸位置
         x_position = 60
@@ -81,7 +84,7 @@ def print_zebra_label(data):
         # 日期
         zpl_command += f"^FO{x_position},{y_position + barcode_height + 100}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD日期:3/11^FS"
+        zpl_command += f"^FD日期:{current_date}^FS"
 
         # 工單號
         zpl_command += f"^FO{x_position},{y_position + barcode_height + 200}"

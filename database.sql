@@ -34,27 +34,18 @@ CREATE TABLE IF NOT EXISTS uploaded_data (
     -- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO uploaded_data (工單號,品名,`機台(預)`) VALUES ('123','456','A01');
+INSERT INTO uploaded_data (工單號,品名,`機台(預)`) 
+    VALUES ('123','456','A01');
 
 CREATE TABLE IF NOT EXISTS 機台狀態 (
     代碼 VARCHAR(5) PRIMARY KEY,
     狀態 VARCHAR(50) NOT NULL
 );
 
--- 插入預設狀態
 INSERT INTO 機台狀態 (代碼, 狀態) VALUES 
-('1', '正常運轉'),
-('A', '架機(改車)'),
-('B', '待排程'),
-('C', '待確認'),
-('D', '生產(繼續車)日期未到'),
-('E', '待訂單'),
-('0', '零件維修'),
-('F', '委外維修'),
-('G', '待機(繼續車)'),
-('H', '待訂');
+('1', '正常運轉'),('A', '架機(改車)'),('B', '待排程'),('C', '待確認'),('D', '生產(繼續車)日期未到'),
+('E', '待訂單'),('0', '零件維修'),('F', '委外維修'),('G', '待機(繼續車)'),('H', '待訂');
 
--- 修改機台看板表，移除班別、僱車人員欄位
 CREATE TABLE IF NOT EXISTS 機台看板 (
     機台 VARCHAR(10) NOT NULL PRIMARY KEY,
     狀態 VARCHAR(5) DEFAULT 'D',
@@ -64,7 +55,6 @@ CREATE TABLE IF NOT EXISTS 機台看板 (
     送料機 VARCHAR(50)
 );
 
--- 插入預設狀態
 TRUNCATE TABLE 機台看板;
 INSERT INTO 機台看板 (機台) VALUES 
 ('A01'),('A02'),('A03'),('A04'),('A05'),('A06'),('A07'),('A08'),('A09'),('A10'),
@@ -75,7 +65,6 @@ INSERT INTO 機台看板 (機台) VALUES
 ('C14'),('C15'),('C16'),('C17'),('F01'),('F02'),('F03'),('F04'),('F05'),('F06'),
 ('F07'),('F08'),('F09'),('F10'),('F11'),('F12'),('F13'),('F14'),('F15'),('F16');
 
--- 修改生產紀錄表，增加日期欄位
 CREATE TABLE IF NOT EXISTS 生產紀錄表 (
     條碼編號 VARCHAR(20) NOT NULL PRIMARY KEY,
     工單號 VARCHAR(50) NOT NULL,
@@ -84,15 +73,13 @@ CREATE TABLE IF NOT EXISTS 生產紀錄表 (
     機台 VARCHAR(10) NOT NULL,
     箱數 VARCHAR(2) NOT NULL,
     班別 VARCHAR(10),
-    建立時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-
-ALTER TABLE 生產紀錄表 
-ADD COLUMN 檢驗人 VARCHAR(50),
-ADD COLUMN 重量 DECIMAL(10,3),
-ADD COLUMN 單重 DECIMAL(10,5),
-ADD COLUMN 檢驗時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN 檢驗狀態 TINYINT DEFAULT 0;
+    建立時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    檢驗人 VARCHAR(50),
+    重量 DECIMAL(10,3),
+    單重 DECIMAL(10,5),
+    數量 INT,
+    檢驗時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    檢驗狀態 TINYINT DEFAULT 0;
 );
 
 CREATE TABLE IF NOT EXISTS 圖號表 (
@@ -103,7 +90,6 @@ CREATE TABLE IF NOT EXISTS 圖號表 (
     材質 VARCHAR(50) NOT NULL,
     只_2_5M INT NOT NULL
 );
-
 
 INSERT INTO 圖號表 (品名, 圖號, 規格, 材料外徑, 材質, 只_2_5M) VALUES
 ('023-HH', '0-41', 'ø', 8.5, 'C3604', 420),
