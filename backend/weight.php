@@ -123,8 +123,11 @@ function saveData() {
         // 開始事務
         $pdo->beginTransaction();
         
-        // 判斷異常狀態
+        // 判斷異常狀態 - 確保是整數值
         $isAbnormal = ($status === '異常') ? 1 : 0;
+        
+        // 記錄異常狀態以便調試
+        error_log('異常狀態值: ' . $isAbnormal . ', 原始狀態: ' . $status);
         
         // 更新生產紀錄表，增加異常欄位
         $updateSql = "UPDATE 生產紀錄表 
@@ -142,7 +145,7 @@ function saveData() {
         
         // 查詢更新後的記錄，為打印標籤做準備
         $selectSql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車,
-                        pr.重量, pr.單重, pr.數量, pr.檢驗人, ud.料號
+                        pr.重量, pr.單重, pr.數量, pr.檢驗人, pr.異常, ud.料號, '電' AS 後續單位
                       FROM 生產紀錄表 pr
                       LEFT JOIN uploaded_data ud ON pr.工單號 = ud.工單號
                       WHERE pr.條碼編號 = ?";
@@ -153,6 +156,10 @@ function saveData() {
         
         // 提交事務
         $pdo->commit();
+        
+        // 再次確認異常狀態值
+        $abnormalValue = $record['異常'] ?? $isAbnormal;
+        error_log('從資料庫獲取的異常狀態: ' . $abnormalValue);
         
         // 呼叫 Python 腳本打印標籤
         $labelCommand = '"' . PYTHON_PATH . '" "' . LABEL_SCRIPT_PATH . '" ' . 
@@ -166,7 +173,7 @@ function saveData() {
                          escapeshellarg($record['檢驗人']) . " " . 
                          escapeshellarg($record['後續單位'] ?? '電') . " " .
                          escapeshellarg($record['班別'] ?? '日') . " " .
-                         escapeshellarg($record['異常'] ?? '0');
+                         escapeshellarg($abnormalValue); // 使用確認過的異常狀態值
         
         // 記錄執行的命令以便調試
         error_log('Executing label command: ' . $labelCommand);

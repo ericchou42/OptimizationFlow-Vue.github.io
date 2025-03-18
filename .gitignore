@@ -1,1 +1,5 @@
 /.venv
+/backend/weight_log.txt
+/backend/label_log.txt
+/backend/barcode_log.txt
+printer_log.txt

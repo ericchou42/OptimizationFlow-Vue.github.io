@@ -89,12 +89,12 @@ def print_zebra_label(data):
         zpl_command += f"^FD部^FS"
 
         # |
-        zpl_command += f"^FO{50},{300}"
+        zpl_command += f"^FO{60},{400}"
         zpl_command += "^A@N,30,30,E:ARIAL.TTF"
         zpl_command += f"^FD|^FS"
 
         # MM4
-        zpl_command += f"^FO{30},{500}"
+        zpl_command += f"^FO{30},{450}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FDMM4^FS"
 
@@ -133,7 +133,7 @@ def print_zebra_label(data):
             zpl_command += f"^FO{750},{y_position}"
             zpl_command += "^A@N,60,60,E:ARIAL.TTF"
             zpl_command += "^FR" # 反轉顏色
-            zpl_command += "^FB400,1,0,C" # 文字區塊，居中對齊
+            # zpl_command += "^FB400,1,0,C" # 文字區塊，居中對齊
             zpl_command += f"^FD異常^FS"
 
         # 淨重
@@ -211,7 +211,7 @@ def main():
             '數量': quantity,
             '檢驗人': inspector,
             '後續單位': next_unit,  # 新增後續單位
-            '班別': shift
+            '班別': shift,
             '異常': abnormal  # 添加異常狀態
         }
         
