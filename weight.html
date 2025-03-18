@@ -27,16 +27,13 @@
             border-radius: 5px;
             border: 1px solid #dee2e6;
         }
-        .inspector-option {
-            font-size: 20px;
-            margin-right: 15px;
-            cursor: pointer;
-            padding: 10px;
-            display: inline-block;
-        }
-        .inspector-checkbox {
-            transform: scale(1.5);
-            margin-right: 8px;
+        .inspector-button {
+            font-size: 24px;
+            margin: 10px;
+            padding: 20px 30px;
+            border-radius: 10px;
+            width: 100%;
+            text-align: center;
         }
         .barcode-section {
             margin-bottom: 20px;
@@ -90,9 +87,11 @@
             margin-bottom: 20px;
         }
         .action-buttons button {
-            font-size: 20px;
-            padding: 12px 24px;
-            margin-right: 10px;
+            font-size: 24px;
+            padding: 20px 30px;
+            margin: 10px;
+            width: 45%;
+            border-radius: 10px;
         }
         .hidden {
             display: none;
@@ -133,13 +132,15 @@
         <!-- 檢驗人選擇區域 -->
         <div class="inspector-selection" v-if="!inspectorSelected">
             <h2 class="section-title">請選擇檢驗人員</h2>
-            <div class="inspector-option" v-for="inspector in inspectors" :key="inspector.id">
-                <label>
-                    <input type="radio" name="inspector" :value="inspector.id" v-model="selectedInspectorId" class="inspector-checkbox">
-                    {{ inspector.name }}
-                </label>
+            <div class="row">
+                <div class="col-md-4" v-for="inspector in inspectors" :key="inspector.id">
+                    <button 
+                        class="btn btn-primary inspector-button btn-touch" 
+                        @click="selectInspector(inspector.id)">
+                        {{ inspector.name }}
+                    </button>
+                </div>
             </div>
-            <button class="btn btn-primary mt-3 btn-touch" @click="confirmInspector" :disabled="!selectedInspectorId">確認</button>
         </div>
 
         <!-- 條碼輸入區域 -->
@@ -218,10 +219,15 @@
 
         <!-- 按鈕區域 -->
         <div class="action-buttons" v-if="productInfo">
-            <div class="d-grid gap-2">
-                <button @click="submitData" class="btn btn-primary btn-lg btn-touch" :disabled="!canSubmit">
-                    <i class="bi bi-check-circle"></i> 送出資料
+            <div class="d-flex justify-content-between">
+                <button @click="submitData('合格')" class="btn btn-success btn-lg btn-touch" :disabled="!canSubmit">
+                    <i class="bi bi-check-circle"></i> 合格
                 </button>
+                <button @click="submitData('異常')" class="btn btn-danger btn-lg btn-touch" :disabled="!canSubmit">
+                    <i class="bi bi-exclamation-triangle"></i> 異常
+                </button>
+            </div>
+            <div class="d-grid gap-2 mt-3">
                 <button @click="resetForm" class="btn btn-secondary btn-touch">
                     <i class="bi bi-arrow-clockwise"></i> 重置
                 </button>
@@ -288,11 +294,10 @@
                     calculatedQuantity.value > 0
                 );
                 
-                // 確認檢驗人員
-                const confirmInspector = () => {
-                    if (selectedInspectorId.value) {
-                        inspectorSelected.value = true;
-                    }
+                // 選擇檢驗人員
+                const selectInspector = (inspectorId) => {
+                    selectedInspectorId.value = inspectorId;
+                    inspectorSelected.value = true;
                 };
                 
                 // 獲取產品資訊
@@ -307,6 +312,17 @@
                         
                         if (response.data.success) {
                             productInfo.value = response.data.data;
+                            
+                            // 如果有現有的重量和單重資料，則填入
+                            if (productInfo.value.重量 && parseFloat(productInfo.value.重量) > 0) {
+                                weight.value = parseFloat(productInfo.value.重量);
+                            }
+                            
+                            if (productInfo.value.單重 && parseFloat(productInfo.value.單重) > 0) {
+                                unitWeight.value = parseFloat(productInfo.value.單重);
+                            }
+                            
+                            calculateQuantity();
                             showMessage('成功獲取產品資訊', 'alert-success');
                         } else {
                             showMessage(response.data.message || '查無此條碼', 'alert-danger');
@@ -341,7 +357,7 @@
                 };
                 
                 // 提交資料
-                const submitData = async () => {
+                const submitData = async (status) => {
                     if (!canSubmit.value) {
                         showMessage('請填寫所有必要資訊', 'alert-warning');
                         return;
@@ -353,13 +369,14 @@
                             inspector: selectedInspectorId.value,
                             weight: weight.value,
                             unitWeight: unitWeight.value,
-                            quantity: calculatedQuantity.value
+                            quantity: calculatedQuantity.value,
+                            status: status // 新增狀態參數
                         };
                         
                         const response = await axios.post('backend/weight.php?action=saveData', data);
                         
                         if (response.data.success) {
-                            showMessage('資料儲存成功', 'alert-success');
+                            showMessage(`資料儲存成功 - ${status}`, 'alert-success');
                             setTimeout(() => {
                                 resetForm();
                             }, 2000);
@@ -438,7 +455,7 @@
                     displayWeight,
                     calculatedQuantity,
                     canSubmit,
-                    confirmInspector,
+                    selectInspector,
                     fetchProductInfo,
                     getWeight,
                     calculateQuantity,

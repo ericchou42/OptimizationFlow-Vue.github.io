@@ -8,9 +8,10 @@ import logging
 
 # 設定日誌記錄
 logging.basicConfig(
-    filename='barcode_log.txt',
+    filename='label_log.txt',
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    encoding='utf-8'  # 添加明確的編碼設定
 )
 
 def connect_to_database():
@@ -54,7 +55,7 @@ def print_zebra_label(data):
         # 定義標籤參數
         # XY軸位置
         x_position = 60
-        x_position_right = 650
+        x_position_right = 670
         y_position = 50
 
         # 條碼高度和模組寬度

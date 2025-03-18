@@ -198,6 +198,7 @@
                                 <th>品名</th>
                                 <th>箱數</th>
                                 <th>僱車</th>
+                                <th>後續單位</th>
                                 <th>班別</th>
                                 <th>列印</th>
                                 <th>重印箱數</th>
@@ -220,6 +221,12 @@
                                     </td>
                                     <td>
                                         <input type="text" v-model="item.operator" class="form-control" placeholder="僱車人員">
+                                    </td>
+                                    <td>
+                                        <select v-model="item.nextUnit" class="form-control">
+                                            <option value="電">電</option>
+                                            <option value="加工">加工</option>
+                                        </select>
                                     </td>
                                     <td>
                                         <select v-model="item.shift" class="form-control">
@@ -354,6 +361,7 @@ const printBarcode = async (item) => {
             productName: item.productName,
             boxCount: item.boxCount,
             operator: item.operator,
+            nextUnit: item.nextUnit || '電',
             shift: item.shift || '日'
         });
         
@@ -390,6 +398,7 @@ const reprintBarcode = async (item) => {
             productName: item.productName,
             boxNumber: item.reprintBoxCount || '01',
             operator: item.operator || '',
+            nextUnit: item.nextUnit || '電',
             shift: item.shift || '日'
         });
         
@@ -494,6 +503,8 @@ const fetchData = async () => {
                     reprintBoxCount: '01',
                     // 正確設置班別預設值，使用剛剛計算的 defaultShift
                     shift: defaultShift,
+                    // 新增後續單位欄位，預設為電
+                    nextUnit: item.nextUnit || '電',
                     // 雇車默認為空，由用戶填寫
                     operator: ''
                 };
@@ -602,7 +613,8 @@ const saveWorkOrder = async (car) => {
         const response = await axios.post('./backend/barcodePrint.php?action=save_work_order', {
             car: car,
             status: item.currentStatus,
-            workOrder: item.currentWorkOrder
+            workOrder: item.currentWorkOrder,
+            nextUnit: item.nextUnit || '電'
         });
 
         if (response.data.success) {

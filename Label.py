@@ -10,7 +10,8 @@ import logging
 logging.basicConfig(
     filename='label_log.txt',
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    encoding='utf-8'  # 添加明確的編碼設定
 )
 
 def connect_to_database():
@@ -54,7 +55,7 @@ def print_zebra_label(data):
         # 定義標籤參數
         # XY軸位置
         x_position = 200
-        x_position_right = 600
+        x_position_right = 590
         y_position = 30
 
         # 條碼模組寬度(1-10)，數字越大條碼越寬
@@ -87,6 +88,16 @@ def print_zebra_label(data):
         zpl_command += "^A@N,80,80,E:ARIAL.TTF"
         zpl_command += f"^FD部^FS"
 
+        # |
+        zpl_command += f"^FO{50},{300}"
+        zpl_command += "^A@N,30,30,E:ARIAL.TTF"
+        zpl_command += f"^FD|^FS"
+
+        # MM4
+        zpl_command += f"^FO{30},{500}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FDMM4^FS"
+
         # 入庫日期
         zpl_command += f"^FO{x_position},{y_position}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
@@ -110,14 +121,22 @@ def print_zebra_label(data):
         # 後續單位
         zpl_command += f"^FO{x_position},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD後續單位:電^FS"
+        zpl_command += f"^FD後續單位:{data['後續單位']}^FS"
 
-        # 人員
+        # 檢驗人
         zpl_command += f"^FO{x_position},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD人員:{data['檢驗人']}^FS"
+        zpl_command += f"^FD檢驗:{data['檢驗人']}^FS"
 
-        # 淨量
+        # 異常品
+        if '異常' in data and data['異常'] == 1:
+            zpl_command += f"^FO{750},{y_position}"
+            zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+            zpl_command += "^FR" # 反轉顏色
+            zpl_command += "^FB400,1,0,C" # 文字區塊，居中對齊
+            zpl_command += f"^FD異常^FS"
+
+        # 淨重
         zpl_command += f"^FO{x_position_right},{y_position + 300}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD淨重:{data['重量']}^FS"
@@ -167,7 +186,7 @@ def main():
     logging.info(f"命令行參數: {sys.argv}")
     
     # 檢查命令行參數
-    if len(sys.argv) >= 9:
+    if len(sys.argv) >= 11:  # 增加一個參數
         # 從命令行直接使用參數
         work_order = sys.argv[1]
         product_name = sys.argv[2]
@@ -177,7 +196,9 @@ def main():
         weight = sys.argv[6]
         quantity = sys.argv[7]
         inspector = sys.argv[8]
-        shift = sys.argv[9] if len(sys.argv) > 9 else '日'
+        next_unit = sys.argv[9]  # 新增後續單位參數
+        shift = sys.argv[10] if len(sys.argv) > 10 else '日'  # 班別參數位置調整
+        abnormal = int(sys.argv[11]) if len(sys.argv) > 11 else 0  # 新增異常參數，預設為0
         
         # 構建數據字典
         data = {
@@ -189,7 +210,9 @@ def main():
             '重量': weight,
             '數量': quantity,
             '檢驗人': inspector,
+            '後續單位': next_unit,  # 新增後續單位
             '班別': shift
+            '異常': abnormal  # 添加異常狀態
         }
         
         # 直接打印標籤

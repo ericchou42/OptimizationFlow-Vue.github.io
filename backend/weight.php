@@ -40,8 +40,9 @@ function getProductInfo() {
     }
 
     try {
-        // 查詢生產紀錄表
-        $sql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車, ud.料號
+        // 查詢生產紀錄表，增加重量和單重欄位
+        $sql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車, 
+                pr.重量, pr.單重, pr.數量, pr.檢驗人, ud.料號
                 FROM 生產紀錄表 pr
                 LEFT JOIN uploaded_data ud ON pr.工單號 = ud.工單號
                 WHERE pr.條碼編號 = ?";
@@ -110,6 +111,7 @@ function saveData() {
     $weight = $postData['weight'] ?? 0;
     $unitWeight = $postData['unitWeight'] ?? 0;
     $quantity = $postData['quantity'] ?? 0;
+    $status = $postData['status'] ?? '合格'; // 新增狀態參數，預設為合格
     
     // 驗證資料
     if (empty($barcode) || empty($inspector) || $weight <= 0 || $unitWeight <= 0 || $quantity <= 0) {
@@ -121,13 +123,16 @@ function saveData() {
         // 開始事務
         $pdo->beginTransaction();
         
-        // 更新生產紀錄表
+        // 判斷異常狀態
+        $isAbnormal = ($status === '異常') ? 1 : 0;
+        
+        // 更新生產紀錄表，增加異常欄位
         $updateSql = "UPDATE 生產紀錄表 
-                     SET 檢驗人 = ?, 重量 = ?, 單重 = ?, 數量 = ?, 檢驗時間 = NOW(), 檢驗狀態 = 1
+                     SET 檢驗人 = ?, 重量 = ?, 單重 = ?, 數量 = ?, 檢驗時間 = NOW(), 檢驗狀態 = 1, 異常 = ?
                      WHERE 條碼編號 = ?";
         
         $updateStmt = $pdo->prepare($updateSql);
-        $updateStmt->execute([$inspector, $weight, $unitWeight, $quantity, $barcode]);
+        $updateStmt->execute([$inspector, $weight, $unitWeight, $quantity, $isAbnormal, $barcode]);
         
         if ($updateStmt->rowCount() === 0) {
             $pdo->rollBack();
@@ -159,7 +164,9 @@ function saveData() {
                          escapeshellarg($record['重量']) . " " . 
                          escapeshellarg($record['數量']) . " " . 
                          escapeshellarg($record['檢驗人']) . " " . 
-                         escapeshellarg($record['班別'] ?? '日');
+                         escapeshellarg($record['後續單位'] ?? '電') . " " .
+                         escapeshellarg($record['班別'] ?? '日') . " " .
+                         escapeshellarg($record['異常'] ?? '0');
         
         // 記錄執行的命令以便調試
         error_log('Executing label command: ' . $labelCommand);
