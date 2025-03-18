@@ -54,7 +54,7 @@ def print_zebra_label(data):
         # 定義標籤參數
         # XY軸位置
         x_position = 200
-        x_position_right = 630
+        x_position_right = 600
         y_position = 30
 
         # 條碼模組寬度(1-10)，數字越大條碼越寬
@@ -175,7 +175,7 @@ def main():
         operator = sys.argv[4]
         machine = sys.argv[5]
         weight = sys.argv[6]
-        unit_weight = sys.argv[7]
+        quantity = sys.argv[7]
         inspector = sys.argv[8]
         shift = sys.argv[9] if len(sys.argv) > 9 else '日'
         
@@ -187,7 +187,7 @@ def main():
             '顧車': operator,
             '機台': machine,
             '重量': weight,
-            '數量': unit_weight,
+            '數量': quantity,
             '檢驗人': inspector,
             '班別': shift
         }

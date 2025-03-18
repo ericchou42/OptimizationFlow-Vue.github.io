@@ -3,6 +3,7 @@ from mysql.connector import Error
 import socket
 import sys
 import os
+import datetime
 import logging
 
 # 設定日誌記錄
@@ -53,7 +54,7 @@ def print_zebra_label(data):
         # 定義標籤參數
         # XY軸位置
         x_position = 60
-        x_position_right = 600
+        x_position_right = 650
         y_position = 50
 
         # 條碼高度和模組寬度

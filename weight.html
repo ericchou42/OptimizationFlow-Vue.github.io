@@ -73,6 +73,15 @@
             text-align: center;
             border-radius: 5px;
         }
+        .quantity-display {
+            font-size: 36px;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #e9ecef;
+            text-align: center;
+            border-radius: 5px;
+            color: #0d6efd;
+        }
         .weight-input {
             margin-top: 15px;
         }
@@ -126,11 +135,11 @@
             <h2 class="section-title">請選擇檢驗人員</h2>
             <div class="inspector-option" v-for="inspector in inspectors" :key="inspector.id">
                 <label>
-                    <input type="radio" name="inspector" :value="inspector.id" v-model="selectedInspector" class="inspector-checkbox">
+                    <input type="radio" name="inspector" :value="inspector.id" v-model="selectedInspectorId" class="inspector-checkbox">
                     {{ inspector.name }}
                 </label>
             </div>
-            <button class="btn btn-primary mt-3 btn-touch" @click="confirmInspector" :disabled="!selectedInspector">確認</button>
+            <button class="btn btn-primary mt-3 btn-touch" @click="confirmInspector" :disabled="!selectedInspectorId">確認</button>
         </div>
 
         <!-- 條碼輸入區域 -->
@@ -170,6 +179,10 @@
                     <th>箱數:</th>
                     <td>{{ productInfo.箱數 }}</td>
                 </tr>
+                <tr>
+                    <th>檢驗人:</th>
+                    <td>{{ selectedInspectorName }}</td>
+                </tr>
             </table>
         </div>
 
@@ -189,12 +202,17 @@
             
             <div class="weight-input">
                 <label for="weight" class="form-label">手動調整重量 (kg)</label>
-                <input type="number" id="weight" v-model="weight" class="form-control" step="0.001" min="0">
+                <input type="number" id="weight" v-model="weight" class="form-control" step="0.001" min="0" @input="calculateQuantity">
             </div>
             
             <div class="unit-weight-input">
                 <label for="unitWeight" class="form-label">單重 (kg / 個)</label>
-                <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0">
+                <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0" @input="calculateQuantity">
+            </div>
+            
+            <h2 class="section-title mt-4">計算結果</h2>
+            <div class="quantity-display">
+                {{ calculatedQuantity }} 個
             </div>
         </div>
 
@@ -230,13 +248,13 @@
             setup() {
                 // 檢驗人員清單
                 const inspectors = ref([
-                    { id: 1, name: '王曉明' },
-                    { id: 2, name: '王大明' },
-                    { id: 3, name: '李曉慧' }
+                    { id: '王曉明', name: '王曉明' },
+                    { id: '王大明', name: '王大明' },
+                    { id: '李曉慧', name: '李曉慧' }
                 ]);
                 
                 // 狀態變數
-                const selectedInspector = ref('');
+                const selectedInspectorId = ref('');
                 const inspectorSelected = ref(false);
                 const barcode = ref('');
                 const productInfo = ref(null);
@@ -245,21 +263,34 @@
                 const message = ref('');
                 const messageType = ref('');
                 const isFullScreen = ref(false);
-                const weightInterval = ref(null);
                 
                 // 計算屬性
+                const selectedInspectorName = computed(() => {
+                    const inspector = inspectors.value.find(i => i.id === selectedInspectorId.value);
+                    return inspector ? inspector.name : '';
+                });
+                
                 const displayWeight = computed(() => parseFloat(weight.value).toFixed(3));
+                
+                const calculatedQuantity = computed(() => {
+                    if (parseFloat(unitWeight.value) > 0 && parseFloat(weight.value) > 0) {
+                        return Math.round(parseFloat(weight.value) / parseFloat(unitWeight.value));
+                    }
+                    return 0;
+                });
+                
                 const canSubmit = computed(() => 
-                    selectedInspector.value && 
+                    selectedInspectorId.value && 
                     barcode.value && 
                     productInfo.value && 
                     parseFloat(weight.value) > 0 && 
-                    parseFloat(unitWeight.value) > 0
+                    parseFloat(unitWeight.value) > 0 &&
+                    calculatedQuantity.value > 0
                 );
                 
                 // 確認檢驗人員
                 const confirmInspector = () => {
-                    if (selectedInspector.value) {
+                    if (selectedInspectorId.value) {
                         inspectorSelected.value = true;
                     }
                 };
@@ -293,6 +324,7 @@
                         
                         if (response.data.success) {
                             weight.value = response.data.weight;
+                            calculateQuantity();
                             showMessage('成功獲取重量', 'alert-success');
                         } else {
                             showMessage(response.data.message || '無法獲取重量', 'alert-warning');
@@ -301,6 +333,11 @@
                         console.error('獲取重量錯誤:', error);
                         showMessage('獲取重量失敗，請手動輸入', 'alert-warning');
                     }
+                };
+                
+                // 計算數量
+                const calculateQuantity = () => {
+                    // calculatedQuantity 是已經定義的計算屬性，會根據 weight 和 unitWeight 自動計算
                 };
                 
                 // 提交資料
@@ -313,9 +350,10 @@
                     try {
                         const data = {
                             barcode: barcode.value,
-                            inspector: selectedInspector.value,
+                            inspector: selectedInspectorId.value,
                             weight: weight.value,
-                            unitWeight: unitWeight.value
+                            unitWeight: unitWeight.value,
+                            quantity: calculatedQuantity.value
                         };
                         
                         const response = await axios.post('backend/weight.php?action=saveData', data);
@@ -340,6 +378,7 @@
                     productInfo.value = null;
                     weight.value = 0;
                     unitWeight.value = 0;
+                    // 保留檢驗人員選擇
                 };
                 
                 // 全螢幕切換
@@ -386,7 +425,8 @@
                 
                 return {
                     inspectors,
-                    selectedInspector,
+                    selectedInspectorId,
+                    selectedInspectorName,
                     inspectorSelected,
                     barcode,
                     productInfo,
@@ -396,10 +436,12 @@
                     messageType,
                     isFullScreen,
                     displayWeight,
+                    calculatedQuantity,
                     canSubmit,
                     confirmInspector,
                     fetchProductInfo,
                     getWeight,
+                    calculateQuantity,
                     submitData,
                     resetForm,
                     toggleFullScreen

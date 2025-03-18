@@ -41,7 +41,7 @@ function getProductInfo() {
 
     try {
         // 查詢生產紀錄表
-        $sql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, ud.料號
+        $sql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車, ud.料號
                 FROM 生產紀錄表 pr
                 LEFT JOIN uploaded_data ud ON pr.工單號 = ud.工單號
                 WHERE pr.條碼編號 = ?";
@@ -109,9 +109,10 @@ function saveData() {
     $inspector = $postData['inspector'] ?? '';
     $weight = $postData['weight'] ?? 0;
     $unitWeight = $postData['unitWeight'] ?? 0;
+    $quantity = $postData['quantity'] ?? 0;
     
     // 驗證資料
-    if (empty($barcode) || empty($inspector) || $weight <= 0 || $unitWeight <= 0) {
+    if (empty($barcode) || empty($inspector) || $weight <= 0 || $unitWeight <= 0 || $quantity <= 0) {
         sendResponse(false, '請填寫所有必要資訊');
         return;
     }
@@ -122,11 +123,11 @@ function saveData() {
         
         // 更新生產紀錄表
         $updateSql = "UPDATE 生產紀錄表 
-                     SET 檢驗人 = ?, 重量 = ?, 單重 = ?, 檢驗時間 = NOW(), 檢驗狀態 = 1
+                     SET 檢驗人 = ?, 重量 = ?, 單重 = ?, 數量 = ?, 檢驗時間 = NOW(), 檢驗狀態 = 1
                      WHERE 條碼編號 = ?";
         
         $updateStmt = $pdo->prepare($updateSql);
-        $updateStmt->execute([$inspector, $weight, $unitWeight, $barcode]);
+        $updateStmt->execute([$inspector, $weight, $unitWeight, $quantity, $barcode]);
         
         if ($updateStmt->rowCount() === 0) {
             $pdo->rollBack();
@@ -136,7 +137,7 @@ function saveData() {
         
         // 查詢更新後的記錄，為打印標籤做準備
         $selectSql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車,
-                        pr.重量, pr.單重, pr.檢驗人, ud.料號
+                        pr.重量, pr.單重, pr.數量, pr.檢驗人, ud.料號
                       FROM 生產紀錄表 pr
                       LEFT JOIN uploaded_data ud ON pr.工單號 = ud.工單號
                       WHERE pr.條碼編號 = ?";
@@ -156,8 +157,9 @@ function saveData() {
                          escapeshellarg($record['顧車']) . " " . 
                          escapeshellarg($record['機台']) . " " . 
                          escapeshellarg($record['重量']) . " " . 
-                         escapeshellarg($record['單重']) . " " . 
-                         escapeshellarg($record['檢驗人']);
+                         escapeshellarg($record['數量']) . " " . 
+                         escapeshellarg($record['檢驗人']) . " " . 
+                         escapeshellarg($record['班別'] ?? '日');
         
         // 記錄執行的命令以便調試
         error_log('Executing label command: ' . $labelCommand);
