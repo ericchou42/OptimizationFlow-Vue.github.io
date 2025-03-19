@@ -119,6 +119,21 @@
         .btn-touch:active {
             transform: scale(0.97);
         }
+        /* 詳細資訊區域樣式 */
+        .details-toggle {
+            cursor: pointer;
+            color: #0d6efd;
+            text-decoration: underline;
+            margin-top: 10px;
+            display: block;
+        }
+        .additional-info {
+            background-color: #f1f8ff;
+            border: 1px solid #cce5ff;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
@@ -185,6 +200,59 @@
                     <td>{{ selectedInspectorName }}</td>
                 </tr>
             </table>
+            
+            <!-- 詳細資訊顯示開關 -->
+            <div class="text-center">
+                <span @click="toggleAdditionalInfo" class="details-toggle">
+                    {{ showAdditionalInfo ? '隱藏詳細資訊' : '顯示詳細資訊' }}
+                </span>
+            </div>
+            
+            <!-- 額外詳細資訊區域 -->
+            <div v-if="showAdditionalInfo" class="additional-info">
+                <table class="table table-sm">
+                    <tr v-if="productInfo.交期">
+                        <th>交期:</th>
+                        <td>{{ productInfo.交期 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.工單數">
+                        <th>工單數:</th>
+                        <td>{{ productInfo.工單數 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.實際入庫">
+                        <th>實際入庫:</th>
+                        <td>{{ productInfo.實際入庫 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.產速">
+                        <th>產速:</th>
+                        <td>{{ productInfo.產速 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.台數">
+                        <th>台數:</th>
+                        <td>{{ productInfo.台數 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.日產量">
+                        <th>日產量:</th>
+                        <td>{{ productInfo.日產量 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.架機說明">
+                        <th>架機說明:</th>
+                        <td>{{ productInfo.架機說明 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.架機日期">
+                        <th>架機日期:</th>
+                        <td>{{ productInfo.架機日期 }}</td>
+                    </tr>
+                    <tr v-if="productInfo['機台(預)']">
+                        <th>機台(預):</th>
+                        <td>{{ productInfo['機台(預)'] }}</td>
+                    </tr>
+                    <tr v-if="productInfo.利潤中心">
+                        <th>利潤中心:</th>
+                        <td>{{ productInfo.利潤中心 }}</td>
+                    </tr>
+                </table>
+            </div>
         </div>
 
         <!-- 重量控制區域 -->
@@ -269,6 +337,7 @@
                 const message = ref('');
                 const messageType = ref('');
                 const isFullScreen = ref(false);
+                const showAdditionalInfo = ref(false);
                 
                 // 計算屬性
                 const selectedInspectorName = computed(() => {
@@ -298,6 +367,11 @@
                 const selectInspector = (inspectorId) => {
                     selectedInspectorId.value = inspectorId;
                     inspectorSelected.value = true;
+                };
+                
+                // 切換額外資訊顯示
+                const toggleAdditionalInfo = () => {
+                    showAdditionalInfo.value = !showAdditionalInfo.value;
                 };
                 
                 // 獲取產品資訊
@@ -395,6 +469,7 @@
                     productInfo.value = null;
                     weight.value = 0;
                     unitWeight.value = 0;
+                    showAdditionalInfo.value = false;
                     // 保留檢驗人員選擇
                 };
                 
@@ -455,13 +530,15 @@
                     displayWeight,
                     calculatedQuantity,
                     canSubmit,
+                    showAdditionalInfo,
                     selectInspector,
                     fetchProductInfo,
                     getWeight,
                     calculateQuantity,
                     submitData,
                     resetForm,
-                    toggleFullScreen
+                    toggleFullScreen,
+                    toggleAdditionalInfo
                 };
             }
         }).mount('#app');

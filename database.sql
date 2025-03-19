@@ -1,5 +1,5 @@
 -- 建立資料庫
-CREATE DATABASE IF NOT EXISTS excel_manager;
+CREATE DATABASE IF NOT EXISTS excel_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE excel_manager;
 
 -- 登入紀錄
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 建立一個使用者名稱為 'admin'，密碼為 'password' 的帳號
 INSERT INTO users (username, password) 
@@ -41,7 +41,7 @@ INSERT INTO uploaded_data (工單號,品名,`機台(預)`)
 CREATE TABLE IF NOT EXISTS 機台狀態 (
     代碼 VARCHAR(5) PRIMARY KEY,
     狀態 VARCHAR(50) NOT NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO 機台狀態 (代碼, 狀態) VALUES 
 ('1', '正常運轉'),('A', '架機(改車)'),('B', '待排程'),('C', '待確認'),('D', '生產(繼續車)日期未到'),
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS 機台看板 (
     箱數 INT,
     支數 VARCHAR(50),
     送料機 VARCHAR(50)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 TRUNCATE TABLE 機台看板;
 INSERT INTO 機台看板 (機台) VALUES 
@@ -81,8 +81,8 @@ CREATE TABLE IF NOT EXISTS 生產紀錄表 (
     數量 INT,
     檢驗時間 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     檢驗狀態 TINYINT DEFAULT 0,
-    異常 TINYINT DEFAULT 0 AFTER 檢驗狀態;
-);
+    異常 TINYINT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS 圖號表 (
     品名 VARCHAR(50) NOT NULL PRIMARY KEY,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS 圖號表 (
     材料外徑 DECIMAL(5,2) NOT NULL,
     材質 VARCHAR(50) NOT NULL,
     只_2_5M INT NOT NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO 圖號表 (品名, 圖號, 規格, 材料外徑, 材質, 只_2_5M) VALUES
 ('023-HH', '0-41', 'ø', 8.5, 'C3604', 420),

@@ -5,9 +5,9 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // 定義 Python 執行環境和腳本的絕對路徑
-define('PYTHON_PATH', 'D:/我的文件/Documents/OptimizationFlow-Vue/.venv/Scripts/python.exe');
-define('LABEL_SCRIPT_PATH', 'D:/我的文件/Documents/OptimizationFlow-Vue/Label.py');
-define('WEIGHT_SCRIPT_PATH', 'D:/我的文件/Documents/OptimizationFlow-Vue/get_weight.py');
+define('PYTHON_PATH', $_ENV['PYTHON_PATH'] ?? 'python');
+define('LABEL_SCRIPT_PATH', $_ENV['SCRIPT_PATH_LABEL'] ?? '');
+define('WEIGHT_SCRIPT_PATH', $_ENV['SCRIPT_PATH_WEIGHT'] ?? '');
 
 // 檢查請求的動作類型
 $action = $_GET['action'] ?? '';
@@ -40,11 +40,14 @@ function getProductInfo() {
     }
 
     try {
-        // 查詢生產紀錄表，增加重量和單重欄位
+        // 使用 BINARY 關鍵字確保按照二進制比較而非字符集排序規則比較
         $sql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車, 
-                pr.重量, pr.單重, pr.數量, pr.檢驗人, ud.料號
+                pr.重量, pr.單重, pr.數量, pr.檢驗人, 
+                ud.料號, ud.交期, ud.工單數, ud.實際入庫,
+                ud.產速, ud.台數, ud.日產量, ud.架機說明, ud.架機日期,
+                ud.`機台(預)`, ud.利潤中心, ud.實際完成, ud.落後百分比
                 FROM 生產紀錄表 pr
-                LEFT JOIN uploaded_data ud ON pr.工單號 = ud.工單號
+                LEFT JOIN uploaded_data ud ON BINARY pr.工單號 = BINARY ud.工單號
                 WHERE pr.條碼編號 = ?";
         
         $stmt = $pdo->prepare($sql);
@@ -54,7 +57,32 @@ function getProductInfo() {
         if ($result) {
             sendResponse(true, '查詢成功', $result);
         } else {
-            sendResponse(false, '查無此條碼');
+            // 如果找不到記錄，嘗試查詢工單號是否存在於 uploaded_data 中
+            // 從條碼中提取可能的工單號部分 (假設工單號在連字符前)
+            $possibleWorkOrder = substr($barcode, 0, strpos($barcode, '-') ?: strlen($barcode));
+            
+            // 優先檢查生產紀錄表，確認條碼不存在
+            $checkBarcodeSql = "SELECT COUNT(*) FROM 生產紀錄表 WHERE 條碼編號 = ?";
+            $checkBarcodeStmt = $pdo->prepare($checkBarcodeSql);
+            $checkBarcodeStmt->execute([$barcode]);
+            $barcodeExists = (int)$checkBarcodeStmt->fetchColumn();
+            
+            if ($barcodeExists > 0) {
+                sendResponse(false, '條碼已存在但無法獲取完整資訊，請聯繫系統管理員');
+                return;
+            }
+            
+            // 檢查工單號是否存在於 uploaded_data
+            $checkWorkOrderSql = "SELECT COUNT(*) FROM uploaded_data WHERE BINARY 工單號 = ?";
+            $checkWorkOrderStmt = $pdo->prepare($checkWorkOrderSql);
+            $checkWorkOrderStmt->execute([$possibleWorkOrder]);
+            $workOrderExists = (int)$checkWorkOrderStmt->fetchColumn();
+            
+            if ($workOrderExists > 0) {
+                sendResponse(false, '此工單號存在於系統中，但條碼尚未登記到生產紀錄表');
+            } else {
+                sendResponse(false, '查無此條碼及相關工單號');
+            }
         }
     } catch (PDOException $e) {
         error_log('查詢產品資訊錯誤: ' . $e->getMessage());
@@ -145,9 +173,11 @@ function saveData() {
         
         // 查詢更新後的記錄，為打印標籤做準備
         $selectSql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車,
-                        pr.重量, pr.單重, pr.數量, pr.檢驗人, pr.異常, ud.料號, '電' AS 後續單位
+                        pr.重量, pr.單重, pr.數量, pr.檢驗人, pr.異常, 
+                        ud.料號, ud.交期,
+                        '電' AS 後續單位
                       FROM 生產紀錄表 pr
-                      LEFT JOIN uploaded_data ud ON pr.工單號 = ud.工單號
+                      LEFT JOIN uploaded_data ud ON BINARY pr.工單號 = BINARY ud.工單號
                       WHERE pr.條碼編號 = ?";
         
         $selectStmt = $pdo->prepare($selectSql);
