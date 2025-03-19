@@ -14,25 +14,26 @@ INSERT INTO users (username, password)
 VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
 
 -- 上傳資料
-CREATE TABLE IF NOT EXISTS uploaded_data (
-    工單號 VARCHAR(50) NOT NULL PRIMARY KEY,
-    料號 VARCHAR(50),
-    品名 TEXT NOT NULL,
-    交期 VARCHAR(50),
-    工單數 INT,
-    實際入庫 INT,
-    產速 DECIMAL(10,2),
-    台數 INT,
-    日產量 INT,
-    架機說明 TEXT,
-    架機日期 VARCHAR(50),
-    `機台(預)` VARCHAR(50),
-    利潤中心 VARCHAR(50),
-    實際完成 VARCHAR(50),
-    落後百分比 DECIMAL(5,2),
-    車製回覆完成日 VARCHAR(50)
-    -- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+CREATE TABLE `uploaded_data` (
+  `工單號` varchar(50) NOT NULL,
+  `料號` varchar(50) DEFAULT NULL,
+  `品名` text NOT NULL,
+  `交期` varchar(50) DEFAULT NULL,
+  `工單數` int(11) DEFAULT NULL,
+  `實際入庫` int(11) DEFAULT NULL,
+  `產速` decimal(10,2) DEFAULT NULL,
+  `台數` int(11) DEFAULT NULL,
+  `日產量` int(11) DEFAULT NULL,
+  `架機說明` text DEFAULT NULL,
+  `架機日期` varchar(50) DEFAULT NULL,
+  `機台(預)` varchar(50) DEFAULT NULL,
+  `利潤中心` varchar(50) DEFAULT NULL,
+  `實際完成` varchar(50) DEFAULT NULL,
+  `落後百分比` decimal(5,2) DEFAULT NULL,
+  `車製回覆完成日` varchar(50) DEFAULT NULL,
+  `狀態` int(11) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO uploaded_data (工單號,品名,`機台(預)`) 
     VALUES ('123','456','A01');
