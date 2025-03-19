@@ -4,9 +4,13 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// 讀取 .env 檔案
+$env_path = __DIR__ . '/../.env';
+$env = file_exists($env_path) ? parse_ini_file($env_path) : [];
+
 // 定義 Python 執行環境和腳本的絕對路徑
-define('PYTHON_PATH', 'D:/我的文件/Documents/OptimizationFlow-Vue/.venv/Scripts/python.exe');
-define('BARCODE_SCRIPT_PATH', 'D:/我的文件/Documents/OptimizationFlow-Vue/barcode.py');
+define('PYTHON_PATH', $env['PYTHON_PATH'] ?? 'python');
+define('BARCODE_SCRIPT_PATH', $env['SCRIPT_PATH_BARCODE'] ?? 'barcode.py');
 
 // 檢查請求的動作類型
 $action = $_GET['action'] ?? '';

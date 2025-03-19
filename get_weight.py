@@ -3,6 +3,11 @@ import sys
 import logging
 import time
 import random  # 用於模擬，實際使用時移除
+import os
+from dotenv import load_dotenv
+
+# 載入環境變數
+load_dotenv()
 
 # 設定日誌
 logging.basicConfig(
@@ -72,8 +77,8 @@ def simulate_weight():
 def main():
     try:
         # 設備參數
-        host = "192.168.1.100"
-        port = 100
+        host = os.getenv('WEIGHT_DEVICE_IP', "192.168.1.100")
+        port = int(os.getenv('WEIGHT_DEVICE_PORT', 100))
         
         try:
             # 嘗試從實際設備獲取重量

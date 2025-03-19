@@ -5,6 +5,10 @@ import sys
 import os
 import datetime
 import logging
+from dotenv import load_dotenv
+
+# 載入環境變數
+load_dotenv()
 
 # 設定日誌記錄
 logging.basicConfig(
@@ -17,10 +21,10 @@ logging.basicConfig(
 def connect_to_database():
     try:
         connection = mysql.connector.connect(
-            host="127.0.0.1",
-            database="excel_manager",
-            user="root",
-            password=""
+            host=os.getenv('DB_HOST', "127.0.0.1"),
+            database=os.getenv('DB_NAME', "excel_manager"),
+            user=os.getenv('DB_USER', "root"),
+            password=os.getenv('DB_PASSWORD', "")
         )
         if connection.is_connected():
             return connection
@@ -127,8 +131,8 @@ def print_zebra_label(data):
         
         # 使用網路打印
         try:
-            printer_ip = "172.29.123.150"
-            printer_port = 9100
+            printer_ip = os.getenv('BARCODE_PRINTER_IP', "172.29.123.150")
+            printer_port = int(os.getenv('BARCODE_PRINTER_PORT', 9100))
             logging.info(f"正在連接打印機 {printer_ip}:{printer_port}")
             printer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             printer_socket.connect((printer_ip, printer_port))

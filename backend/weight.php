@@ -4,10 +4,79 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// 定義 Python 執行環境和腳本的絕對路徑
-define('PYTHON_PATH', $_ENV['PYTHON_PATH'] ?? 'python');
-define('LABEL_SCRIPT_PATH', $_ENV['SCRIPT_PATH_LABEL'] ?? '');
-define('WEIGHT_SCRIPT_PATH', $_ENV['SCRIPT_PATH_WEIGHT'] ?? '');
+// 定義預設值，確保即使環境變數載入失敗也能正常工作
+$default_python_path = 'python';
+$default_label_script_path = 'Label.py';
+$default_weight_script_path = 'get_weight.py';
+
+// 安全地讀取 .env 文件
+function safe_parse_env_file($filepath) {
+    $env_vars = [];
+    
+    // 檢查文件是否存在
+    if (!file_exists($filepath)) {
+        error_log("環境變數檔案不存在: " . $filepath);
+        return $env_vars;
+    }
+    
+    try {
+        // 嘗試使用原生函數解析
+        if (function_exists('parse_ini_file')) {
+            $parsed = @parse_ini_file($filepath);
+            if ($parsed !== false) {
+                return $parsed;
+            }
+        }
+        
+        // 如果原生解析失敗，嘗試手動解析
+        $lines = file($filepath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            // 跳過註釋行
+            if (strpos(trim($line), '#') === 0) {
+                continue;
+            }
+            
+            // 尋找鍵值對
+            $parts = explode('=', $line, 2);
+            if (count($parts) == 2) {
+                $key = trim($parts[0]);
+                $value = trim($parts[1]);
+                
+                // 移除引號
+                if (preg_match('/^("(.*)"|\'(.*)\')$/', $value, $matches)) {
+                    $value = isset($matches[3]) ? $matches[3] : $matches[2];
+                }
+                
+                if (!empty($key)) {
+                    $env_vars[$key] = $value;
+                }
+            }
+        }
+    } catch (Exception $e) {
+        error_log("解析環境變數檔案時發生錯誤: " . $e->getMessage());
+    }
+    
+    return $env_vars;
+}
+
+// 讀取環境變數
+$env_path = dirname(__DIR__) . '/.env';
+$env = safe_parse_env_file($env_path);
+
+// 設定變數，優先使用環境變數，若無則使用預設值
+$python_path = isset($env['PYTHON_PATH']) && !empty($env['PYTHON_PATH']) 
+    ? $env['PYTHON_PATH'] : $default_python_path;
+    
+$label_script_path = isset($env['SCRIPT_PATH_LABEL']) && !empty($env['SCRIPT_PATH_LABEL']) 
+    ? $env['SCRIPT_PATH_LABEL'] : $default_label_script_path;
+    
+$weight_script_path = isset($env['SCRIPT_PATH_WEIGHT']) && !empty($env['SCRIPT_PATH_WEIGHT']) 
+    ? $env['SCRIPT_PATH_WEIGHT'] : $default_weight_script_path;
+
+// 定義常數
+define('PYTHON_PATH', $python_path);
+define('LABEL_SCRIPT_PATH', $label_script_path);
+define('WEIGHT_SCRIPT_PATH', $weight_script_path);
 
 // 檢查請求的動作類型
 $action = $_GET['action'] ?? '';
@@ -26,7 +95,6 @@ switch ($action) {
         sendResponse(false, '無效的請求');
         break;
 }
-
 // 獲取產品資訊
 function getProductInfo() {
     require_once 'config.php';

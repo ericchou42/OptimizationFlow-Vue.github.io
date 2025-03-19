@@ -3,10 +3,14 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // 關閉錯誤顯示，改為捕獲
 
-$host = "127.0.0.1";
-$dbname = "excel_manager";
-$username = "root";
-$password = "";
+// 讀取 .env 檔案
+$env_path = __DIR__ . '/../.env';
+$env = file_exists($env_path) ? parse_ini_file($env_path) : [];
+
+$host = $env['DB_HOST'] ?? "127.0.0.1";
+$dbname = $env['DB_NAME'] ?? "excel_manager";
+$username = $env['DB_USER'] ?? "root";
+$password = $env['DB_PASSWORD'] ?? "";
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
