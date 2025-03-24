@@ -73,3 +73,24 @@ OptimizationFlow-Vue/
 3. **記錄檔安全**
    - 記錄檔可能包含敏感資訊，請確保適當的存取權限
    - 建議設置日誌輪轉以避免日誌檔過大
+
+
+```bash
+# 建立虛擬環境
+python3.12 -m venv .venv
+
+# 啟動 (Linux / macOS)
+source .venv/bin/activate
+
+# 啟動 (Windows)
+.venv\Scripts\activate.ps1
+
+# 安裝套件
+pip install -r requirements.txt
+
+# 開啟服務
+fastapi dev main.py
+
+# 離開
+deactivate
+```

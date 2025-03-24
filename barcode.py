@@ -24,7 +24,7 @@ def connect_to_database():
             host=os.getenv('DB_HOST', "127.0.0.1"),
             database=os.getenv('DB_NAME', "excel_manager"),
             user=os.getenv('DB_USER', "root"),
-            password=os.getenv('DB_PASSWORD', "")
+            password=os.getenv('DB_PASSWORD', "sfc")
         )
         if connection.is_connected():
             return connection

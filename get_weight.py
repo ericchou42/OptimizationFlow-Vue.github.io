@@ -13,7 +13,8 @@ load_dotenv()
 logging.basicConfig(
     filename='weight_log.txt',
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    encoding='utf-8'  # 添加明確的編碼設定
 )
 
 def get_weight_from_device(host, port):
@@ -35,20 +36,29 @@ def get_weight_from_device(host, port):
         s.settimeout(5)  # 設置超時時間為 5 秒
         s.connect((host, port))
         
-        # 發送請求命令（根據設備實際協議進行調整）
-        command = b'GET_WEIGHT\r\n'
-        s.send(command)
-        
-        # 接收回應
+        # 接收數據 (不需要發送命令)
         response = s.recv(1024)
         s.close()
         
-        # 解析回應並提取重量值（根據設備實際協議進行調整）
-        weight_str = response.decode('utf-8').strip()
-        weight = float(weight_str)
+        # 解析回應並提取重量值
+        weight_str = response.decode('utf-8', errors='replace').strip()
+        logging.info(f"從設備獲取的原始數據: {weight_str}")
         
-        logging.info(f"獲取重量成功: {weight} kg")
-        return weight
+        # 解析格式如 "ST,GS,+  5.078kg"
+        if "kg" in weight_str:
+            # 提取數值部分
+            parts = weight_str.split(',')
+            if len(parts) >= 3:
+                weight_part = parts[2].strip()
+                # 去除前面的 '+' 或 '-' 號和單位 'kg'
+                weight_value = weight_part.replace('+', '').replace('kg', '').strip()
+                weight = float(weight_value)
+                logging.info(f"解析後的重量: {weight} kg")
+                return weight
+            else:
+                raise ValueError(f"無法解析重量數據: {weight_str}")
+        else:
+            raise ValueError(f"回應中沒有找到單位 'kg': {weight_str}")
         
     except socket.timeout:
         logging.error("連接設備超時")
