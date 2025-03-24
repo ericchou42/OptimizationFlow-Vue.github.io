@@ -155,14 +155,36 @@
             font-size: 0.9rem;
             color: #6c757d;
         }
+        
+        /* 班別批量選擇區域樣式 */
+        .batch-controls {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        
+        .batch-controls label {
+            margin-right: 10px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="container-fluid">
-            <!-- 當前時間顯示 -->
-            <div class="current-time">
-                當前時間: {{ currentTimeDisplay }} (預設班別: {{ currentHour < 12 ? '夜班' : '日班' }})
+            <!-- 班別批量選擇控制區 -->
+            <div class="batch-controls">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label>批量設定班別：</label>
+                        <div class="btn-group" role="group">
+                            <button @click="setBatchShift('日')" class="btn" :class="{'btn-primary': batchShift === '日', 'btn-outline-primary': batchShift !== '日'}">日班</button>
+                            <button @click="setBatchShift('中')" class="btn" :class="{'btn-primary': batchShift === '中', 'btn-outline-primary': batchShift !== '中'}">中班</button>
+                            <button @click="setBatchShift('夜')" class="btn" :class="{'btn-primary': batchShift === '夜', 'btn-outline-primary': batchShift !== '夜'}">夜班</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- 載入中狀態顯示 -->
@@ -219,7 +241,11 @@
                                         </select>
                                     </td>
                                     <td>
-                                        <input type="text" v-model="item.operator" class="form-control" placeholder="僱車人員">
+                                        <select v-model="item.operator" class="form-control">
+                                            <option v-for="operator in operators" :key="operator" :value="operator">
+                                                {{ operator }}
+                                            </option>
+                                        </select>
                                     </td>
                                     <td>
                                         <select v-model="item.nextUnit" class="form-control">
@@ -230,6 +256,7 @@
                                     <td>
                                         <select v-model="item.shift" class="form-control">
                                             <option value="日">日</option>
+                                            <option value="中">中</option>
                                             <option value="夜">夜</option>
                                         </select>
                                     </td>
@@ -283,7 +310,7 @@
     <script src="js/scripts.js"></script>
     <script src="js/axios.min.js"></script>
     <script>
-        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
         const app = createApp({
             setup() {
@@ -298,22 +325,32 @@
                 const messageType = ref('');
                 const debugApiResponse = ref('');
                 const showDebugInfo = ref(false);
+                const batchShift = ref('日'); // 預設批量班別為日班
                 
-                // 當前時間相關
-                const currentHour = ref(new Date().getHours());
-                const currentTimeDisplay = ref(new Date().toLocaleTimeString());
-                
-                // 每分鐘更新時間
-                setInterval(() => {
-                    const now = new Date();
-                    currentHour.value = now.getHours();
-                    currentTimeDisplay.value = now.toLocaleTimeString();
-                }, 60000);
+                // 顧車人員列表
+                const operators = ref(['黃志強', '吳俊龍', '洪昭南', '陳啟昌', '周堉澤', '李正良', '陳文琪', '林俊男', '劉原良', '楊松川', '郭泳宏', '黃富春', '盧志瑋', '阮文王']); // 可以從此處修改選項
                 
                 // 除錯資訊切換
                 const toggleDebugInfo = () => {
                     showDebugInfo.value = !showDebugInfo.value;
                 };
+                
+                // 批量設定班別
+                const setBatchShift = (shift) => {
+                    batchShift.value = shift;
+                    // 將所有資料的班別設為選定值
+                    data.value.forEach(item => {
+                        item.shift = shift;
+                    });
+                    showMessage(`已將所有項目的班別設為${shift}班`, 'alert-success');
+                };
+                
+                // 監聽 batchShift 變化，自動更新所有項目的班別
+                watch(batchShift, (newValue) => {
+                    data.value.forEach(item => {
+                        item.shift = newValue;
+                    });
+                });
                 
 // 處理箱數選項的函數
 const getBoxOptions = (item) => {
@@ -347,7 +384,7 @@ const printBarcode = async (item) => {
     }
     
     if (!item.operator) {
-        showMessage('請填寫僱車人員', 'alert-danger');
+        showMessage('請選擇僱車人員', 'alert-danger');
         return;
     }
     
@@ -428,7 +465,7 @@ const isHighlighted = (item, entry) => {
             (entry.machineHistory && entry.machineHistory.toLowerCase().includes(term));
 };
 
-// 修正過的 fetchData 函數，確保正確的班別預設邏輯
+// 修正過的 fetchData 函數，移除時間控制班別的邏輯
 const fetchData = async () => {
     try {
         loading.value = true;
@@ -440,14 +477,6 @@ const fetchData = async () => {
         // 保存原始 API 響應用於除錯
         debugApiResponse.value = JSON.stringify(response.data, null, 2);
         console.log('API 回應數據:', response.data);
-        
-        // 獲取當前小時，用於設置班別預設值
-        const now = new Date();
-        const hour = now.getHours();
-        console.log('當前時間小時: ' + hour);
-        // 中午12點以前夜班，以後日班
-        const defaultShift = hour < 12 ? '夜' : '日';
-        console.log('預設班別: ' + defaultShift);
         
         if (response.data.error) {
             error.value = response.data.error;
@@ -499,12 +528,12 @@ const fetchData = async () => {
                     currentBoxCount: item.boxCount || '0', // 儲存原始箱數
                     boxCount: nextBoxCount, // 預設選擇下一個箱數
                     reprintBoxCount: '01',
-                    // 正確設置班別預設值，使用剛剛計算的 defaultShift
-                    shift: defaultShift,
+                    // 使用批量設定的班別
+                    shift: batchShift.value,
                     // 新增後續單位欄位，預設為電
                     nextUnit: item.nextUnit || '電',
-                    // 雇車默認為空，由用戶填寫
-                    operator: ''
+                    // 預設選擇第一個顧車人員
+                    operator: operators.value[0] || ''
                 };
             });
             
@@ -650,11 +679,6 @@ const adjustTableColumns = () => {
                 
 // 頁面載入時獲取數據
 onMounted(() => {
-    // 獲取並更新當前時間
-    const now = new Date();
-    currentHour.value = now.getHours();
-    currentTimeDisplay.value = now.toLocaleTimeString();
-    
     fetchMachineStatuses().then(() => {
         fetchData();
     }).catch(err => {
@@ -684,8 +708,9 @@ return {
     debugApiResponse,
     showDebugInfo,
     toggleDebugInfo,
-    currentHour,
-    currentTimeDisplay
+    batchShift,
+    setBatchShift,
+    operators
 };
             }
         });

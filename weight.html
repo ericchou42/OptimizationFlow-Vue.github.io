@@ -134,6 +134,15 @@
             padding: 10px;
             margin-top: 15px;
         }
+        /* 前箱單重提示樣式 */
+        .prev-box-info {
+            margin-top: 10px;
+            background-color: #e8f4f8;
+            border: 1px solid #b8d0e0;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -275,8 +284,12 @@
             </div>
             
             <div class="unit-weight-input">
-                <label for="unitWeight" class="form-label">單重 (kg / 個)</label>
-                <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0" @input="calculateQuantity">
+                <label for="unitWeight" class="form-label">單重 (1公斤有幾個)</label>
+                <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.01" min="0" @input="calculateQuantity">
+                <!-- 顯示前箱單重參考 -->
+                <div class="prev-box-info" v-if="hasPrevBoxInfo">
+                    參考前箱單重: 1公斤有 {{ (1/productInfo.前箱單重).toFixed(2) }} 個 (前箱重量: {{ productInfo.前箱重量 }} kg, 數量: {{ productInfo.前箱數量 }} 個)
+                </div>
             </div>
             
             <h2 class="section-title mt-4">計算結果</h2>
@@ -289,17 +302,17 @@
         <div class="action-buttons" v-if="productInfo">
             <div class="d-flex justify-content-between">
                 <button @click="submitData('合格')" class="btn btn-success btn-lg btn-touch" :disabled="!canSubmit">
-                    <i class="bi bi-check-circle"></i> 合格
+                    <i class="bi bi-check-circle"></i> OK
                 </button>
                 <button @click="submitData('異常')" class="btn btn-danger btn-lg btn-touch" :disabled="!canSubmit">
-                    <i class="bi bi-exclamation-triangle"></i> 異常
+                    <i class="bi bi-exclamation-triangle"></i> NG
                 </button>
             </div>
-            <div class="d-grid gap-2 mt-3">
+            <!-- <div class="d-grid gap-2 mt-3">
                 <button @click="resetForm" class="btn btn-secondary btn-touch">
                     <i class="bi bi-arrow-clockwise"></i> 重置
                 </button>
-            </div>
+            </div> -->
         </div>
 
         <!-- 訊息顯示區域 -->
@@ -318,9 +331,7 @@
             setup() {
                 // 檢驗人員清單
                 const inspectors = ref([
-                    { id: '王曉明', name: '王曉明' },
-                    { id: '王大明', name: '王大明' },
-                    { id: '李曉慧', name: '李曉慧' }
+                    { id: '鄭惠娟', name: '鄭惠娟' }
                 ]);
                 
                 // 狀態變數
@@ -334,6 +345,7 @@
                 const messageType = ref('');
                 const isFullScreen = ref(false);
                 const showAdditionalInfo = ref(false);
+                const hasPrevBoxInfo = ref(false); // 新增狀態變數，用於追蹤是否有前箱資訊
                 
                 // 計算屬性
                 const selectedInspectorName = computed(() => {
@@ -345,7 +357,8 @@
                 
                 const calculatedQuantity = computed(() => {
                     if (parseFloat(unitWeight.value) > 0 && parseFloat(weight.value) > 0) {
-                        return Math.round(parseFloat(weight.value) / parseFloat(unitWeight.value));
+                        // 新計算邏輯：重量 × 每公斤數量
+                        return Math.round(parseFloat(weight.value) * parseFloat(unitWeight.value));
                     }
                     return 0;
                 });
@@ -383,13 +396,22 @@
                         if (response.data.success) {
                             productInfo.value = response.data.data;
                             
-                            // 如果有現有的重量和單重資料，則填入
-                            if (productInfo.value.重量 && parseFloat(productInfo.value.重量) > 0) {
-                                weight.value = parseFloat(productInfo.value.重量);
+                            // 檢查是否有前箱單重資訊
+                            hasPrevBoxInfo.value = productInfo.value.前箱單重 && parseFloat(productInfo.value.前箱單重) > 0;
+                            
+                            // 優先使用前箱的單重值，如果有的話
+                            if (hasPrevBoxInfo.value) {
+                                // 計算 1公斤有幾個 (1除以每個重量)
+                                unitWeight.value = (1 / parseFloat(productInfo.value.前箱單重)).toFixed(2);
+                                showMessage('已自動填入前箱單重參考值', 'alert-info');
+                            } else if (productInfo.value.單重 && parseFloat(productInfo.value.單重) > 0) {
+                                // 如果沒有前箱資訊但有現有的單重資料，則填入
+                                unitWeight.value = (1 / parseFloat(productInfo.value.單重)).toFixed(2);
                             }
                             
-                            if (productInfo.value.單重 && parseFloat(productInfo.value.單重) > 0) {
-                                unitWeight.value = parseFloat(productInfo.value.單重);
+                            // 如果有現有的重量資料，則填入
+                            if (productInfo.value.重量 && parseFloat(productInfo.value.重量) > 0) {
+                                weight.value = parseFloat(productInfo.value.重量);
                             }
                             
                             calculateQuantity();
@@ -466,6 +488,7 @@
                     weight.value = 0;
                     unitWeight.value = 0;
                     showAdditionalInfo.value = false;
+                    hasPrevBoxInfo.value = false;
                     // 保留檢驗人員選擇
                 };
                 
@@ -527,6 +550,7 @@
                     calculatedQuantity,
                     canSubmit,
                     showAdditionalInfo,
+                    hasPrevBoxInfo, // 匯出前箱資訊狀態
                     selectInspector,
                     fetchProductInfo,
                     getWeight,

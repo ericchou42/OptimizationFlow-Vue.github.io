@@ -123,6 +123,30 @@ function getProductInfo() {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($result) {
+            // 提取工單號和機台號，以便找尋前一箱記錄
+            $workOrder = $result['工單號'];
+            $machine = $result['機台'];
+            $currentBoxNumber = $result['箱數'];
+            
+            // 查詢同一工單號和機台號，但箱號小於當前箱號的最新記錄
+            $prevBoxSql = "SELECT 單重, 重量, 數量
+                          FROM 生產紀錄表
+                          WHERE 工單號 = ? AND 機台 = ? AND CAST(箱數 AS UNSIGNED) < CAST(? AS UNSIGNED) 
+                                AND 單重 > 0 AND 檢驗時間 IS NOT NULL
+                          ORDER BY CAST(箱數 AS UNSIGNED) DESC
+                          LIMIT 1";
+            
+            $prevBoxStmt = $pdo->prepare($prevBoxSql);
+            $prevBoxStmt->execute([$workOrder, $machine, $currentBoxNumber]);
+            $prevBox = $prevBoxStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // 如果找到前一箱的記錄，將單重資訊添加到結果中
+            if ($prevBox && isset($prevBox['單重']) && $prevBox['單重'] > 0) {
+                $result['前箱單重'] = $prevBox['單重'];
+                $result['前箱重量'] = $prevBox['重量'];
+                $result['前箱數量'] = $prevBox['數量'];
+            }
+            
             sendResponse(true, '查詢成功', $result);
         } else {
             // 如果找不到記錄，嘗試查詢工單號是否存在於 uploaded_data 中

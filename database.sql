@@ -49,7 +49,7 @@ INSERT INTO 機台狀態 (代碼, 狀態) VALUES
 
 CREATE TABLE IF NOT EXISTS 機台看板 (
     機台 VARCHAR(10) NOT NULL PRIMARY KEY,
-    狀態 VARCHAR(5) DEFAULT 'D',
+    狀態 VARCHAR(5) DEFAULT '1',
     工單號 VARCHAR(50),
     箱數 INT,
     支數 VARCHAR(50),
