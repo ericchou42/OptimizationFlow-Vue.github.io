@@ -451,7 +451,7 @@ const reprintBarcode = async (item) => {
 // 搜尋過濾功能
 const filteredData = computed(() => {
     if (!Array.isArray(data.value)) return [];
-    return data.value.filter(item => item.currentStatus === 'D');
+    return data.value.filter(item => item.currentStatus === '1');
 });
                 
 // 判斷是否需要高亮顯示

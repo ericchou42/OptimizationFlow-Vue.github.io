@@ -75,7 +75,7 @@ function getCarData() {
         $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, md.箱數 as 箱數, ms.狀態 as 狀態名稱
                 FROM 機台看板 md 
                 LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
-                WHERE md.狀態 = 'D'  /* 僅選取狀態為D的記錄 */
+                WHERE md.狀態 = '1'  /* 僅選取狀態為D的記錄 */
                 ORDER BY md.機台";
         
         error_log('執行SQL查詢: ' . $sql);
@@ -431,7 +431,7 @@ function printBarcode() {
             exec($command, $output, $returnVar);
             
             if ($returnVar !== 0) {
-                $printErrors[] = "箱號 {$barcode['boxNumber']} 列印失敗: " . implode("\n", $output);
+                $printErrors[] = "{$command}{$output}{$returnVar}箱號 {$barcode['boxNumber']} 列印失敗: " . implode("\n", $output);
                 error_log('Print error: ' . implode("\n", $output));
             }
         }
