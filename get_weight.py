@@ -96,7 +96,7 @@ def main():
         except Exception as e:
             logging.warning(f"從設備獲取重量失敗，將使用模擬數據: {e}")
             # 如果實際設備連接失敗，使用模擬數據
-            weight = simulate_weight()
+            # weight = simulate_weight()
         
         # 打印重量值（PHP 將捕獲這個輸出）
         print(weight)
