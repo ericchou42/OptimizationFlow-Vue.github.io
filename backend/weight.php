@@ -108,7 +108,7 @@ function getProductInfo() {
     }
 
     try {
-        // 使用 BINARY 關鍵字確保按照二進制比較而非字符集排序規則比較
+        // 使用原有的查詢獲取條碼資訊
         $sql = "SELECT pr.條碼編號, pr.工單號, pr.品名, pr.機台, pr.箱數, pr.班別, pr.顧車, 
                 pr.重量, pr.單重, pr.數量, pr.檢驗人, 
                 ud.料號, ud.交期, ud.工單數, ud.實際入庫,
@@ -123,58 +123,27 @@ function getProductInfo() {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($result) {
-            // 提取工單號和機台號，以便找尋前一箱記錄
-            $workOrder = $result['工單號'];
-            $machine = $result['機台'];
-            $currentBoxNumber = $result['箱數'];
-            
-            // 查詢同一工單號和機台號，但箱號小於當前箱號的最新記錄
-            $prevBoxSql = "SELECT 單重, 重量, 數量
-                          FROM 生產紀錄表
-                          WHERE 工單號 = ? AND 機台 = ? AND CAST(箱數 AS UNSIGNED) < CAST(? AS UNSIGNED) 
-                                AND 單重 > 0 AND 檢驗時間 IS NOT NULL
-                          ORDER BY CAST(箱數 AS UNSIGNED) DESC
-                          LIMIT 1";
-            
-            $prevBoxStmt = $pdo->prepare($prevBoxSql);
-            $prevBoxStmt->execute([$workOrder, $machine, $currentBoxNumber]);
-            $prevBox = $prevBoxStmt->fetch(PDO::FETCH_ASSOC);
-            
-            // 如果找到前一箱的記錄，將單重資訊添加到結果中
-            if ($prevBox && isset($prevBox['單重']) && $prevBox['單重'] > 0) {
-                $result['前箱單重'] = $prevBox['單重'];
-                $result['前箱重量'] = $prevBox['重量'];
-                $result['前箱數量'] = $prevBox['數量'];
+            // 獲取同一工單號的前一筆檢驗資料
+            if (empty($result['單重']) || floatval($result['單重']) <= 0) {
+                $workOrder = $result['工單號'];
+                $prevSql = "SELECT 單重 
+                           FROM 生產紀錄表 
+                           WHERE 工單號 = ? AND 檢驗狀態 = 1 AND 單重 > 0 
+                           ORDER BY 檢驗時間 DESC 
+                           LIMIT 1";
+                $prevStmt = $pdo->prepare($prevSql);
+                $prevStmt->execute([$workOrder]);
+                $prevResult = $prevStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($prevResult && floatval($prevResult['單重']) > 0) {
+                    $result['前一筆單重'] = floatval($prevResult['單重']);
+                }
             }
             
             sendResponse(true, '查詢成功', $result);
         } else {
-            // 如果找不到記錄，嘗試查詢工單號是否存在於 uploaded_data 中
-            // 從條碼中提取可能的工單號部分 (假設工單號在連字符前)
-            $possibleWorkOrder = substr($barcode, 0, strpos($barcode, '-') ?: strlen($barcode));
-            
-            // 優先檢查生產紀錄表，確認條碼不存在
-            $checkBarcodeSql = "SELECT COUNT(*) FROM 生產紀錄表 WHERE 條碼編號 = ?";
-            $checkBarcodeStmt = $pdo->prepare($checkBarcodeSql);
-            $checkBarcodeStmt->execute([$barcode]);
-            $barcodeExists = (int)$checkBarcodeStmt->fetchColumn();
-            
-            if ($barcodeExists > 0) {
-                sendResponse(false, '條碼已存在但無法獲取完整資訊，請聯繫系統管理員');
-                return;
-            }
-            
-            // 檢查工單號是否存在於 uploaded_data
-            $checkWorkOrderSql = "SELECT COUNT(*) FROM uploaded_data WHERE BINARY 工單號 = ?";
-            $checkWorkOrderStmt = $pdo->prepare($checkWorkOrderSql);
-            $checkWorkOrderStmt->execute([$possibleWorkOrder]);
-            $workOrderExists = (int)$checkWorkOrderStmt->fetchColumn();
-            
-            if ($workOrderExists > 0) {
-                sendResponse(false, '此工單號存在於系統中，但條碼尚未登記到生產紀錄表');
-            } else {
-                sendResponse(false, '查無此條碼及相關工單號');
-            }
+            // 原有的處理邏輯...
+            sendResponse(false, '查無此條碼及相關工單號');
         }
     } catch (PDOException $e) {
         error_log('查詢產品資訊錯誤: ' . $e->getMessage());

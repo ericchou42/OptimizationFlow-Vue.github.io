@@ -264,7 +264,7 @@
             </div>
         </div>
 
-        <!-- 重量控制區域 -->
+        <!-- 修改重量資訊部分 -->
         <div class="weight-controls" v-if="productInfo">
             <h2 class="section-title">重量資訊</h2>
             
@@ -284,12 +284,16 @@
             </div>
             
             <div class="unit-weight-input">
-                <label for="unitWeight" class="form-label">單重 (1公斤有幾個)</label>
-                <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.01" min="0" @input="calculateQuantity">
-                <!-- 顯示前箱單重參考 -->
-                <div class="prev-box-info" v-if="hasPrevBoxInfo">
-                    參考前箱單重: 1公斤有 {{ (1/productInfo.前箱單重).toFixed(2) }} 個 (前箱重量: {{ productInfo.前箱重量 }} kg, 數量: {{ productInfo.前箱數量 }} 個)
+                <label for="unitWeight" class="form-label">單重 (kg / 個)</label>
+                <div class="input-group">
+                    <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0" @input="calculateQuantity">
+                    <button class="btn btn-outline-secondary" @click="usePreviousUnitWeight" v-if="hasPreviousUnitWeight" title="使用前一筆單重">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
                 </div>
+                <small v-if="hasPreviousUnitWeight" class="text-muted">
+                    歷史單重: {{ previousUnitWeight }}
+                </small>
             </div>
             
             <h2 class="section-title mt-4">計算結果</h2>
@@ -325,7 +329,7 @@
     <script src="js/scripts.js"></script>
     <script src="js/axios.min.js"></script>
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
+const { createApp, ref, computed, onMounted } = Vue;
         
         createApp({
             setup() {
@@ -341,11 +345,11 @@
                 const productInfo = ref(null);
                 const weight = ref(0);
                 const unitWeight = ref(0);
+                const previousUnitWeight = ref(null);
                 const message = ref('');
                 const messageType = ref('');
                 const isFullScreen = ref(false);
                 const showAdditionalInfo = ref(false);
-                const hasPrevBoxInfo = ref(false); // 新增狀態變數，用於追蹤是否有前箱資訊
                 
                 // 計算屬性
                 const selectedInspectorName = computed(() => {
@@ -357,11 +361,14 @@
                 
                 const calculatedQuantity = computed(() => {
                     if (parseFloat(unitWeight.value) > 0 && parseFloat(weight.value) > 0) {
-                        // 新計算邏輯：重量 × 每公斤數量
-                        return Math.round(parseFloat(weight.value) * parseFloat(unitWeight.value));
+                        return Math.round(parseFloat(weight.value) / parseFloat(unitWeight.value));
                     }
                     return 0;
                 });
+                
+                const hasPreviousUnitWeight = computed(() => 
+                    previousUnitWeight.value && parseFloat(previousUnitWeight.value) > 0
+                );
                 
                 const canSubmit = computed(() => 
                     selectedInspectorId.value && 
@@ -376,6 +383,14 @@
                 const selectInspector = (inspectorId) => {
                     selectedInspectorId.value = inspectorId;
                     inspectorSelected.value = true;
+                };
+                
+                // 使用前一筆單重
+                const usePreviousUnitWeight = () => {
+                    if (previousUnitWeight.value) {
+                        unitWeight.value = previousUnitWeight.value;
+                        calculateQuantity();
+                    }
                 };
                 
                 // 切換額外資訊顯示
@@ -396,22 +411,20 @@
                         if (response.data.success) {
                             productInfo.value = response.data.data;
                             
-                            // 檢查是否有前箱單重資訊
-                            hasPrevBoxInfo.value = productInfo.value.前箱單重 && parseFloat(productInfo.value.前箱單重) > 0;
-                            
-                            // 優先使用前箱的單重值，如果有的話
-                            if (hasPrevBoxInfo.value) {
-                                // 計算 1公斤有幾個 (1除以每個重量)
-                                unitWeight.value = (1 / parseFloat(productInfo.value.前箱單重)).toFixed(2);
-                                showMessage('已自動填入前箱單重參考值', 'alert-info');
-                            } else if (productInfo.value.單重 && parseFloat(productInfo.value.單重) > 0) {
-                                // 如果沒有前箱資訊但有現有的單重資料，則填入
-                                unitWeight.value = (1 / parseFloat(productInfo.value.單重)).toFixed(2);
-                            }
-                            
                             // 如果有現有的重量資料，則填入
                             if (productInfo.value.重量 && parseFloat(productInfo.value.重量) > 0) {
                                 weight.value = parseFloat(productInfo.value.重量);
+                            }
+                            
+                            // 如果有現有的單重資料，則填入
+                            if (productInfo.value.單重 && parseFloat(productInfo.value.單重) > 0) {
+                                unitWeight.value = parseFloat(productInfo.value.單重);
+                            }
+                            // 如果有前一筆單重資料，保存起來
+                            else if (productInfo.value.前一筆單重) {
+                                previousUnitWeight.value = parseFloat(productInfo.value.前一筆單重).toFixed(5);
+                                // 自動填入前一筆單重
+                                unitWeight.value = previousUnitWeight.value;
                             }
                             
                             calculateQuantity();
@@ -462,7 +475,7 @@
                             weight: weight.value,
                             unitWeight: unitWeight.value,
                             quantity: calculatedQuantity.value,
-                            status: status // 新增狀態參數
+                            status: status
                         };
                         
                         const response = await axios.post('backend/weight.php?action=saveData', data);
@@ -487,8 +500,8 @@
                     productInfo.value = null;
                     weight.value = 0;
                     unitWeight.value = 0;
+                    previousUnitWeight.value = null;
                     showAdditionalInfo.value = false;
-                    hasPrevBoxInfo.value = false;
                     // 保留檢驗人員選擇
                 };
                 
@@ -543,6 +556,8 @@
                     productInfo,
                     weight,
                     unitWeight,
+                    previousUnitWeight,
+                    hasPreviousUnitWeight,
                     message,
                     messageType,
                     isFullScreen,
@@ -550,7 +565,6 @@
                     calculatedQuantity,
                     canSubmit,
                     showAdditionalInfo,
-                    hasPrevBoxInfo, // 匯出前箱資訊狀態
                     selectInspector,
                     fetchProductInfo,
                     getWeight,
@@ -558,7 +572,8 @@
                     submitData,
                     resetForm,
                     toggleFullScreen,
-                    toggleAdditionalInfo
+                    toggleAdditionalInfo,
+                    usePreviousUnitWeight
                 };
             }
         }).mount('#app');
