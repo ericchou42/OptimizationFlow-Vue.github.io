@@ -51,10 +51,10 @@ function getCarData() {
         $stmt->execute();
         $dashboardData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // 2. 獲取預排工單信息
+        // 2. 獲取預排工單信息 - 修改這裡，增加狀態為1的條件
         $sql = "SELECT `機台(預)`, 工單號, 架機日期, 品名 
                 FROM uploaded_data 
-                WHERE `機台(預)` IS NOT NULL AND `機台(預)` <> '' 
+                WHERE `機台(預)` IS NOT NULL AND `機台(預)` <> '' AND 狀態 = 1
                 ORDER BY 架機日期 DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
