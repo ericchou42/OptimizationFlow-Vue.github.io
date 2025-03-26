@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>條碼檢驗與重量管理系統</title>
+    <title>重量管理系統</title>
     <link href="css/styles.css" rel="stylesheet">
     <style>
         body {
@@ -143,6 +143,20 @@
             padding: 10px;
             font-size: 14px;
         }
+        /* 數量輸入框樣式 */
+        .quantity-input {
+            font-size: 36px;
+            width: 100%;
+            text-align: center;
+            color: #0d6efd;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        .quantity-input:focus {
+            border-color: #0d6efd;
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -155,7 +169,7 @@
 
         <!-- 檢驗人選擇區域 -->
         <div class="inspector-selection" v-if="!inspectorSelected">
-            <h2 class="section-title">請選擇檢驗人員</h2>
+            <h2 class="section-title">請選擇磅重人員</h2>
             <div class="row">
                 <div class="col-md-4" v-for="inspector in inspectors" :key="inspector.id">
                     <button 
@@ -205,7 +219,7 @@
                     <td>{{ productInfo.箱數 }}</td>
                 </tr>
                 <tr>
-                    <th>檢驗人:</th>
+                    <th>磅重人:</th>
                     <td>{{ selectedInspectorName }}</td>
                 </tr>
             </table>
@@ -297,9 +311,12 @@
             </div>
             
             <h2 class="section-title mt-4">計算結果</h2>
-            <div class="quantity-display">
-                {{ calculatedQuantity }} 個
+            <!-- 修改這裡：從只讀顯示變為可編輯的輸入框 -->
+            <div class="quantity-input-container">
+                <label for="editedQuantity" class="form-label">數量 (個) <small class="text-muted">可手動調整</small></label>
+                <input type="number" id="editedQuantity" v-model="editedQuantity" class="quantity-input" min="1" step="1">
             </div>
+            <small class="text-muted">系統計算數量: {{ calculatedQuantity }} 個</small>
         </div>
 
         <!-- 按鈕區域 -->
@@ -329,11 +346,11 @@
     <script src="js/scripts.js"></script>
     <script src="js/axios.min.js"></script>
     <script>
-const { createApp, ref, computed, onMounted } = Vue;
+const { createApp, ref, computed, onMounted, watch } = Vue;
         
         createApp({
             setup() {
-                // 檢驗人員清單
+                // 磅重人員清單
                 const inspectors = ref([
                     { id: '鄭惠娟', name: '鄭惠娟' }
                 ]);
@@ -351,6 +368,10 @@ const { createApp, ref, computed, onMounted } = Vue;
                 const isFullScreen = ref(false);
                 const showAdditionalInfo = ref(false);
                 
+                // 新增可編輯的數量變數
+                const editedQuantity = ref(0);
+                const quantityManuallyEdited = ref(false);
+                
                 // 計算屬性
                 const selectedInspectorName = computed(() => {
                     const inspector = inspectors.value.find(i => i.id === selectedInspectorId.value);
@@ -366,6 +387,18 @@ const { createApp, ref, computed, onMounted } = Vue;
                     return 0;
                 });
                 
+                // 監聽計算數量的變化，如果未手動編輯過，則自動更新編輯數量
+                watch(calculatedQuantity, (newVal) => {
+                    if (!quantityManuallyEdited.value && newVal > 0) {
+                        editedQuantity.value = newVal;
+                    }
+                });
+                
+                // 監聽編輯數量的變化，標記為已手動編輯
+                watch(editedQuantity, () => {
+                    quantityManuallyEdited.value = true;
+                });
+                
                 const hasPreviousUnitWeight = computed(() => 
                     previousUnitWeight.value && parseFloat(previousUnitWeight.value) > 0
                 );
@@ -376,7 +409,7 @@ const { createApp, ref, computed, onMounted } = Vue;
                     productInfo.value && 
                     parseFloat(weight.value) > 0 && 
                     parseFloat(unitWeight.value) > 0 &&
-                    calculatedQuantity.value > 0
+                    parseInt(editedQuantity.value) > 0
                 );
                 
                 // 選擇檢驗人員
@@ -427,6 +460,12 @@ const { createApp, ref, computed, onMounted } = Vue;
                                 unitWeight.value = previousUnitWeight.value;
                             }
                             
+                            // 如果有現有的數量資料，則填入編輯數量
+                            if (productInfo.value.數量 && parseInt(productInfo.value.數量) > 0) {
+                                editedQuantity.value = parseInt(productInfo.value.數量);
+                                quantityManuallyEdited.value = true;
+                            }
+                            
                             calculateQuantity();
                             showMessage('成功獲取產品資訊', 'alert-success');
                         } else {
@@ -458,7 +497,10 @@ const { createApp, ref, computed, onMounted } = Vue;
                 
                 // 計算數量
                 const calculateQuantity = () => {
-                    // calculatedQuantity 是已經定義的計算屬性，會根據 weight 和 unitWeight 自動計算
+                    // 如果數量未被手動編輯過，則更新編輯數量為計算結果
+                    if (!quantityManuallyEdited.value && calculatedQuantity.value > 0) {
+                        editedQuantity.value = calculatedQuantity.value;
+                    }
                 };
                 
                 // 提交資料
@@ -474,7 +516,7 @@ const { createApp, ref, computed, onMounted } = Vue;
                             inspector: selectedInspectorId.value,
                             weight: weight.value,
                             unitWeight: unitWeight.value,
-                            quantity: calculatedQuantity.value,
+                            quantity: parseInt(editedQuantity.value), // 使用編輯後的數量
                             status: status
                         };
                         
@@ -502,6 +544,8 @@ const { createApp, ref, computed, onMounted } = Vue;
                     unitWeight.value = 0;
                     previousUnitWeight.value = null;
                     showAdditionalInfo.value = false;
+                    editedQuantity.value = 0;
+                    quantityManuallyEdited.value = false;
                     // 保留檢驗人員選擇
                 };
                 
@@ -563,6 +607,7 @@ const { createApp, ref, computed, onMounted } = Vue;
                     isFullScreen,
                     displayWeight,
                     calculatedQuantity,
+                    editedQuantity, // 新增返回編輯數量
                     canSubmit,
                     showAdditionalInfo,
                     selectInspector,
