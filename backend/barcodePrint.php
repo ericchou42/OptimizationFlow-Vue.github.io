@@ -28,8 +28,8 @@ switch ($action) {
     case 'update_machine':
         updateMachine();
         break;
-    case 'print_barcode':
-        printBarcode();
+    case 'print_box_count':
+        print_box_count();
         break;
     case 'reprint_barcode':
         reprintBarcode();
@@ -72,10 +72,10 @@ function getCarData() {
         error_log('getCarData 函數開始執行');
 
         // 1. 獲取機台看板的基礎數據 - 移除顧車和班別的子查詢
-        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, md.箱數 as 箱數, ms.狀態 as 狀態名稱
+        $sql = "SELECT md.機台 as 車台號, md.狀態, md.工單號, ms.狀態 as 狀態名稱
                 FROM 機台看板 md 
                 LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
-                WHERE md.狀態 = '1'  /* 僅選取狀態為D的記錄 */
+                WHERE md.狀態 = '1'  /* 僅選取狀態為1的記錄 */
                 ORDER BY md.機台";
         
         error_log('執行SQL查詢: ' . $sql);
@@ -136,10 +136,6 @@ function getCarData() {
             $productName = isset($workOrderMap[$workOrderId]) ? $workOrderMap[$workOrderId] : "";
             $drawingInfo = isset($drawingMap[$productName]) ? $drawingMap[$productName] : null;
             
-            // 確保箱數是數字並轉為字符串
-            $boxCount = isset($dashboard['箱數']) ? intval($dashboard['箱數']) : 0;
-            $boxCountStr = str_pad($boxCount, 2, '0', STR_PAD_LEFT);
-            
             $result[$carId] = [
                 'car' => $carId,
                 'currentStatus' => $dashboard['狀態'] ?: 'B',
@@ -147,7 +143,6 @@ function getCarData() {
                 'currentWorkOrder' => $workOrderId,
                 'productName' => $productName,
                 'drawingInfo' => $drawingInfo,
-                'boxCount' => $boxCountStr,
                 // 移除從數據庫獲取雇車和班別，前端會設置
                 'operator' => '',
                 'shift' => '',
@@ -182,7 +177,9 @@ function getCarData() {
         
         // 記錄輸出結果
         error_log('輸出數組數量: ' . count($outputArray));
-        error_log('輸出數據結構: ' . json_encode(array_keys($outputArray[0] ?? [])));
+        if (count($outputArray) > 0) {
+            error_log('輸出數據結構: ' . json_encode(array_keys($outputArray[0] ?? [])));
+        }
         
         // 確保不會有其他輸出，然後輸出JSON
         ob_clean(); // 清除任何已有的輸出緩衝
@@ -194,41 +191,6 @@ function getCarData() {
     } catch (Exception $e) {
         error_log('一般錯誤: ' . $e->getMessage());
         echo json_encode(['error' => '處理失敗: ' . $e->getMessage()]);
-    }
-}
-
-// 獲取實際工單號和狀態
-function getActualWorkOrder($car, $pdo) {
-    try {
-        // 檢查表是否存在
-        $checkTableSql = "SHOW TABLES LIKE 'OProduction_Schedule'";
-        $checkTable = $pdo->query($checkTableSql);
-        
-        if ($checkTable->rowCount() == 0) {
-            // 如果表不存在，返回空值
-            return ['workOrder' => null, 'status' => null];
-        }
-        
-        // 查詢車台對應的實際工單和狀態
-        $sql = "SELECT ops.工單號, ops.狀態, ms.status_name 
-                FROM OProduction_Schedule ops 
-                LEFT JOIN OMachine_Status ms ON ops.狀態 = ms.id 
-                WHERE ops.車台號 = ? 
-                ORDER BY ops.更新時間 DESC LIMIT 1";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$car]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        // 如果有結果，返回工單號和狀態，否則返回null
-        return $result ? [
-            'workOrder' => $result['工單號'],
-            'status' => $result['狀態'],
-            'statusName' => $result['status_name']
-        ] : ['workOrder' => null, 'status' => null, 'statusName' => null];
-    } catch (PDOException $e) {
-        error_log('獲取實際工單號錯誤: ' . $e->getMessage());
-        // 出錯時返回null
-        return ['workOrder' => null, 'status' => null, 'statusName' => null];
     }
 }
 
@@ -309,15 +271,7 @@ function updateMachine() {
     }
 
     try {
-        $sql = "UPDATE 機台看板 
-                SET 箱數 = ?
-                WHERE 機台 = ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            $data['boxCount'] ?? '01',
-            $data['car']
-        ]);
-
+        // 移除更新箱數的功能，因為現在箱數由生產紀錄表決定
         echo json_encode([
             'success' => true,
             'message' => '更新成功'
@@ -332,8 +286,8 @@ function updateMachine() {
     }
 }
 
-// 條碼列印功能
-function printBarcode() {
+// 依照指定箱數列印條碼功能 - 先更新資料庫再列印
+function print_box_count() {
     // 1. 連接資料庫並設置回應頭
     require_once 'config.php';
     header('Content-Type: application/json');
@@ -342,79 +296,122 @@ function printBarcode() {
     $data = json_decode(file_get_contents('php://input'), true);
 
     // 3. 檢查必要參數
-    if (!isset($data['car']) || !isset($data['workOrder'])) {
+    if (!isset($data['car']) || !isset($data['workOrder']) || !isset($data['date']) || !isset($data['boxCount'])) {
         echo json_encode(['success' => false, 'error' => '缺少必要參數']);
         return;
     }
 
     try {
         // 4. 準備資料
-        $newBoxCount = intval($data['boxCount'] ?? '01');
         $car = $data['car'];
         $workOrder = $data['workOrder'];
         $operator = $data['operator'] ?? '';
         $shift = $data['shift'] ?? '日';
+        $shiftNumber = $data['shiftNumber'] ?? '1';
         $productName = $data['productName'] ?? '';
+        $date = $data['date'] ?? date('Ymd');
+        $boxCount = intval($data['boxCount']);
+        $nextUnit = $data['nextUnit'] ?? '電';
         
-        // 檢查目前機台看板的箱數
-        $currentBoxQuery = "SELECT 箱數 FROM 機台看板 WHERE 機台 = ?";
-        $currentBoxStmt = $pdo->prepare($currentBoxQuery);
-        $currentBoxStmt->execute([$car]);
-        $currentBoxResult = $currentBoxStmt->fetch(PDO::FETCH_ASSOC);
-        $currentBox = intval($currentBoxResult['箱數'] ?? 0);
+        // 驗證箱數範圍
+        if ($boxCount < 1) $boxCount = 1;
+        if ($boxCount > 3) $boxCount = 3;
         
-        // 如果新箱數小於等於目前箱數，回傳錯誤
-        if ($newBoxCount <= $currentBox) {
-            echo json_encode(['success' => false, 'error' => '新箱數必須大於目前箱數']);
-            return;
-        }
-        
-        // 如果新箱數大於9，限制為9
-        if ($newBoxCount > 9) {
-            $newBoxCount = 9;
-        }
-        
-        // 5. 開始事務處理
+        // 5. 開始資料庫事務
         $pdo->beginTransaction();
-        
-        // 6. 更新機台看板資料
-        $updateSql = "UPDATE 機台看板 SET 箱數 = ? WHERE 機台 = ?";
-        $updateStmt = $pdo->prepare($updateSql);
-        $updateStmt->execute([$newBoxCount, $car]);
-        
-        // 7. 循環插入新增的箱數記錄
         $barcodeIds = [];
         
-        // 從目前箱數+1開始，到新箱數結束
-        for ($i = $currentBox + 1; $i <= $newBoxCount; $i++) {
-            $boxNumber = str_pad($i, 2, '0', STR_PAD_LEFT);
-            $barcodeId = $workOrder . $car . $boxNumber;
+        // 6. 先處理所有資料庫操作
+        for ($boxNum = 1; $boxNum <= $boxCount; $boxNum++) {
+            $boxNumber = str_pad($boxNum, 2, '0', STR_PAD_LEFT);
+            
+            // 7. 構建條碼編號
+            $barcodeId = $date . $workOrder . $car . $shiftNumber . $boxNumber;
             $barcodeIds[] = [
                 'id' => $barcodeId,
                 'boxNumber' => $boxNumber
             ];
             
-            // 8. 檢查條碼是否已存在
+            // 8. 檢查條碼是否已存在，如果存在則更新
             $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 條碼編號 = ?";
             $checkStmt = $pdo->prepare($checkSql);
             $checkStmt->execute([$barcodeId]);
             
             if ($checkStmt->rowCount() == 0) {
-                // 9. 條碼不存在，新增記錄
-                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?)";
-                $insertStmt = $pdo->prepare($insertSql);
-                $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
+                // 條碼不存在，新增記錄
+                // 檢查是否需要新增後續單位欄位
+                $columnExists = false;
+                try {
+                    $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
+                    $columnExists = ($columnCheck->rowCount() > 0);
+                } catch (PDOException $e) {
+                    error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
+                }
+                
+                if ($columnExists) {
+                    // 資料表已有後續單位欄位
+                    $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別, 後續單位) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                    $insertStmt = $pdo->prepare($insertSql);
+                    $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift, $nextUnit]);
+                } else {
+                    // 資料表尚未新增後續單位欄位，先執行ALTER TABLE
+                    try {
+                        $alterSql = "ALTER TABLE 生產紀錄表 ADD COLUMN 後續單位 VARCHAR(50) DEFAULT '電' AFTER 班別";
+                        $pdo->exec($alterSql);
+                        error_log('已新增後續單位欄位到生產紀錄表');
+                        
+                        // 然後插入記錄
+                        $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別, 後續單位) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                        $insertStmt = $pdo->prepare($insertSql);
+                        $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift, $nextUnit]);
+                    } catch (PDOException $e) {
+                        // 如果無法新增欄位，則使用原始SQL
+                        error_log('新增後續單位欄位失敗: ' . $e->getMessage());
+                        $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?)";
+                        $insertStmt = $pdo->prepare($insertSql);
+                        $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
+                    }
+                }
+            } else {
+                // 條碼已存在，更新記錄
+                // 檢查是否有後續單位欄位
+                $columnExists = false;
+                try {
+                    $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
+                    $columnExists = ($columnCheck->rowCount() > 0);
+                } catch (PDOException $e) {
+                    error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
+                }
+                
+                if ($columnExists) {
+                    // 更新包含後續單位
+                    $updateSql = "UPDATE 生產紀錄表 
+                                SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
+                                WHERE 條碼編號 = ?";
+                    $updateStmt = $pdo->prepare($updateSql);
+                    $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
+                } else {
+                    // 不包含後續單位
+                    $updateSql = "UPDATE 生產紀錄表 
+                                SET 品名 = ?, 顧車 = ?, 班別 = ? 
+                                WHERE 條碼編號 = ?";
+                    $updateStmt = $pdo->prepare($updateSql);
+                    $updateStmt->execute([$productName, $operator, $shift, $barcodeId]);
+                }
             }
         }
         
-        // 10. 提交資料庫變更
+        // 9. 提交資料庫事務 - 無論後續列印是否成功，資料庫變更都會保存
         $pdo->commit();
         
-        // 11. 循環執行列印 - 使用絕對路徑
+        // 10. 開始執行列印
         $printErrors = [];
+        
         foreach ($barcodeIds as $barcode) {
-            // 使用預定義的常量設置完整的 Python 路徑和腳本路徑
+            // 執行列印命令
             $command = '"' . PYTHON_PATH . '" "' . BARCODE_SCRIPT_PATH . '" ' . 
                       escapeshellarg($barcode['id']) . " " . 
                       escapeshellarg($workOrder) . " " . 
@@ -431,26 +428,44 @@ function printBarcode() {
             exec($command, $output, $returnVar);
             
             if ($returnVar !== 0) {
-                $printErrors[] = "{$command}{$output}{$returnVar}箱號 {$barcode['boxNumber']} 列印失敗: " . implode("\n", $output);
+                $printErrors[] = "箱號 {$barcode['boxNumber']} 列印失敗: " . implode("\n", $output);
                 error_log('Print error: ' . implode("\n", $output));
             }
         }
         
-        // 12. 檢查是否有列印錯誤
+        // 11. 檢查是否有列印錯誤
         if (!empty($printErrors)) {
-            echo json_encode(['success' => false, 'error' => implode("\n", $printErrors)]);
+            // 即使有列印錯誤，資料庫更新也已經完成
+            echo json_encode([
+                'success' => false, 
+                'error' => implode("\n", $printErrors),
+                'dataUpdated' => true, // 指示資料庫已更新
+                'message' => "資料庫更新成功，但列印失敗。"
+            ]);
             return;
         }
         
-        echo json_encode(['success' => true, 'message' => '列印成功']);
+        // 全部成功
+        echo json_encode([
+            'success' => true, 
+            'message' => "批量列印成功，共 {$boxCount} 張標籤"
+        ]);
         
     } catch (PDOException $e) {
-        // 13. 發生錯誤時回滾事務
+        // 資料庫操作錯誤時回滾事務
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        error_log('列印條碼錯誤: ' . $e->getMessage());
-        echo json_encode(['success' => false, 'error' => '處理失敗: ' . $e->getMessage()]);
+        error_log('資料庫錯誤: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'error' => '資料庫處理失敗: ' . $e->getMessage()]);
+    } catch (Exception $e) {
+        // 其他錯誤，如果資料庫事務已提交，不需要回滾
+        error_log('處理錯誤: ' . $e->getMessage());
+        echo json_encode([
+            'success' => false, 
+            'error' => '處理失敗: ' . $e->getMessage(),
+            'dataUpdated' => !$pdo->inTransaction() // 如果不在事務中，表示資料已更新
+        ]);
     }
 }
 
@@ -473,20 +488,100 @@ function reprintBarcode() {
         $productName = $data['productName'] ?? '';
         $operator = $data['operator'] ?? '';
         $shift = $data['shift'] ?? '日';
+        $date = $data['date'] ?? date('Ymd');
+        $shiftNumber = $data['shiftNumber'] ?? '1';
+        $nextUnit = $data['nextUnit'] ?? '電';
         
-        $barcodeId = $workOrder . $car . $boxNumber;
+        // 構建條碼編號
+        $barcodeId = $date . $workOrder . $car . $shiftNumber . $boxNumber;
         
-        // 檢查條碼是否存在
-        $checkSql = "SELECT * FROM 生產紀錄表 WHERE 條碼編號 = ?";
-        $checkStmt = $pdo->prepare($checkSql);
-        $checkStmt->execute([$barcodeId]);
-
-        if ($checkStmt->rowCount() == 0) {
-            echo json_encode(['success' => false, 'error' => '未找到對應的條碼記錄']);
-            return;
+        // 檢查新格式條碼是否存在
+        $checkNewSql = "SELECT * FROM 生產紀錄表 WHERE 條碼編號 = ?";
+        $checkNewStmt = $pdo->prepare($checkNewSql);
+        $checkNewStmt->execute([$barcodeId]);
+        
+        // 如果新格式條碼不存在，檢查舊格式
+        if ($checkNewStmt->rowCount() == 0) {
+            // 檢查舊格式條碼
+            $oldBarcodeId = $workOrder . $car . $boxNumber;
+            $checkOldSql = "SELECT * FROM 生產紀錄表 WHERE 條碼編號 = ?";
+            $checkOldStmt = $pdo->prepare($checkOldSql);
+            $checkOldStmt->execute([$oldBarcodeId]);
+            
+            if ($checkOldStmt->rowCount() == 0) {
+                // 兩種格式都不存在，嘗試創建新記錄
+                $columnExists = false;
+                try {
+                    $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
+                    $columnExists = ($columnCheck->rowCount() > 0);
+                } catch (PDOException $e) {
+                    error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
+                }
+                
+                if ($columnExists) {
+                    $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別, 後續單位) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                    $insertStmt = $pdo->prepare($insertSql);
+                    $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift, $nextUnit]);
+                } else {
+                    $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?)";
+                    $insertStmt = $pdo->prepare($insertSql);
+                    $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
+                }
+            } else {
+                // 使用舊格式條碼
+                $barcodeId = $oldBarcodeId;
+                
+                // 更新舊記錄
+                $columnExists = false;
+                try {
+                    $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
+                    $columnExists = ($columnCheck->rowCount() > 0);
+                } catch (PDOException $e) {
+                    error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
+                }
+                
+                if ($columnExists) {
+                    $updateSql = "UPDATE 生產紀錄表 
+                                SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
+                                WHERE 條碼編號 = ?";
+                    $updateStmt = $pdo->prepare($updateSql);
+                    $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
+                } else {
+                    $updateSql = "UPDATE 生產紀錄表 
+                                SET 品名 = ?, 顧車 = ?, 班別 = ? 
+                                WHERE 條碼編號 = ?";
+                    $updateStmt = $pdo->prepare($updateSql);
+                    $updateStmt->execute([$productName, $operator, $shift, $barcodeId]);
+                }
+            }
+        } else {
+            // 更新記錄信息
+            $columnExists = false;
+            try {
+                $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
+                $columnExists = ($columnCheck->rowCount() > 0);
+            } catch (PDOException $e) {
+                error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
+            }
+            
+            if ($columnExists) {
+                $updateSql = "UPDATE 生產紀錄表 
+                            SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
+                            WHERE 條碼編號 = ?";
+                $updateStmt = $pdo->prepare($updateSql);
+                $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
+            } else {
+                $updateSql = "UPDATE 生產紀錄表 
+                            SET 品名 = ?, 顧車 = ?, 班別 = ? 
+                            WHERE 條碼編號 = ?";
+                $updateStmt = $pdo->prepare($updateSql);
+                $updateStmt->execute([$productName, $operator, $shift, $barcodeId]);
+            }
         }
         
-        // 使用絕對路徑執行 Python 腳本
+        // 無論如何，使用當前的條碼ID列印
         $command = '"' . PYTHON_PATH . '" "' . BARCODE_SCRIPT_PATH . '" ' . 
                   escapeshellarg($barcodeId) . " " . 
                   escapeshellarg($workOrder) . " " . 
@@ -503,7 +598,11 @@ function reprintBarcode() {
                 
         if ($returnVar !== 0) {
             error_log('Reprint error: ' . implode("\n", $output));
-            echo json_encode(['success' => false, 'error' => '重印失敗: ' . implode("\n", $output)]);
+            echo json_encode([
+                'success' => false, 
+                'error' => '重印失敗: ' . implode("\n", $output),
+                'dataUpdated' => true
+            ]);
             return;
         }
         
@@ -530,16 +629,39 @@ function checkBarcode() {
     try {
         $car = $data['car'];
         $workOrder = $data['workOrder'];
+        $date = $data['date'] ?? date('Ymd');
+        $shift = $data['shift'] ?? '1'; // 班別數字
         
-        // 檢查是否有對應的條碼記錄
-        $sql = "SELECT COUNT(*) as count FROM 生產紀錄表 WHERE 條碼編號 LIKE ? AND 工單號 = ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$workOrder . $car . '%', $workOrder]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        // 檢查舊格式條碼
+        $oldPrefix = $workOrder . $car;
+        $oldSql = "SELECT 箱數 FROM 生產紀錄表 WHERE 條碼編號 LIKE ? ORDER BY 箱數 ASC";
+        $oldStmt = $pdo->prepare($oldSql);
+        $oldStmt->execute([$oldPrefix . '%']);
+        $oldBoxes = $oldStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // 檢查新格式條碼
+        $newPrefix = $date . $workOrder . $car . $shift;
+        $newSql = "SELECT 箱數 FROM 生產紀錄表 WHERE 條碼編號 LIKE ? ORDER BY 箱數 ASC";
+        $newStmt = $pdo->prepare($newSql);
+        $newStmt->execute([$newPrefix . '%']);
+        $newBoxes = $newStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // 合併兩種格式找到的箱數
+        $existingBoxes = array_merge($oldBoxes, $newBoxes);
+        
+        // 去重
+        $existingBoxes = array_unique($existingBoxes);
+        
+        // 將箱數轉換為整數
+        $boxNumbers = array_map('intval', $existingBoxes);
+        
+        // 排序
+        sort($boxNumbers);
         
         echo json_encode([
             'success' => true,
-            'exists' => ($result['count'] > 0)
+            'exists' => !empty($boxNumbers),
+            'existingBoxes' => $boxNumbers
         ]);
         
     } catch (PDOException $e) {

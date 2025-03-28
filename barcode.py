@@ -10,13 +10,13 @@ from dotenv import load_dotenv
 # 載入環境變數
 load_dotenv()
 
-# # 設定日誌記錄
-# logging.basicConfig(
-#     filename='/tmp/barcode_log.txt',
-#     level=logging.INFO,
-#     format='%(asctime)s - %(levelname)s - %(message)s',
-#     encoding='utf-8'  # 添加明確的編碼設定
-# )
+# 設定日誌記錄
+logging.basicConfig(
+    filename='/tmp/barcode_log.txt',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    encoding='utf-8'  # 添加明確的編碼設定
+)
 
 def connect_to_database():
     try:
@@ -49,12 +49,25 @@ def get_work_order_data(connection, work_order_number):
         print(f"查詢錯誤: {e}")
         return None
 
-def print_zebra_label(data):
+def print_zebra_label(data, barcode_id):
     try:
         logging.info(f"準備列印標籤: {data}")
 
-        # 獲取當前日期
-        current_date = datetime.datetime.now().strftime("%Y/%m/%d")
+        # 從條碼編號前8碼獲取日期
+        # if len(barcode_id) >= 8:
+        date_str = barcode_id[:8]
+            # try:
+                # 假設條碼編號前8碼格式為YYYYMMDD
+                date_obj = datetime.datetime.strptime(date_str, "%Y%m%d")
+                formatted_date = date_obj.strftime("%Y/%m/%d")
+            # except ValueError:
+            #     # 如果解析失敗，使用當前日期
+            #     logging.warning(f"無法從條碼編號 {barcode_id} 解析日期，使用當前日期")
+            #     formatted_date = datetime.datetime.now().strftime("%Y/%m/%d")
+        # else:
+        #     # 如果條碼編號不足8位，使用當前日期
+        #     logging.warning(f"條碼編號 {barcode_id} 不足8位，使用當前日期")
+        #     formatted_date = datetime.datetime.now().strftime("%Y/%m/%d")
 
         # 定義標籤參數
         # XY軸位置
@@ -90,7 +103,7 @@ def print_zebra_label(data):
         # 日期
         zpl_command += f"^FO{x_position},{y_position + barcode_height + 100}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD日期:{current_date}^FS"
+        zpl_command += f"^FD日期:{formatted_date}^FS"
 
         # 工單號
         zpl_command += f"^FO{x_position},{y_position + barcode_height + 200}"
@@ -196,7 +209,7 @@ def main():
             }
             
             # 列印標籤
-            success = print_zebra_label(data)
+            success = print_zebra_label(data, barcode_id)
             
             # 設置退出代碼
             sys.exit(0 if success else 1)
