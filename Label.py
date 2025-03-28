@@ -59,8 +59,8 @@ def print_zebra_label(data):
         
         # 定義標籤參數
         # XY軸位置
-        x_position = 200
-        x_position_right = 590
+        x_position = 170
+        x_position_right = 560
         y_position = 30
 
         # 條碼模組寬度(1-10)，數字越大條碼越寬
@@ -118,15 +118,15 @@ def print_zebra_label(data):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD料號:{data['料號']}^FS"
 
-        # 備註 車台
+        # 數量
         zpl_command += f"^FO{x_position},{y_position + 300}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD機台:{data['機台']}^FS"
+        zpl_command += f"^FD數量:{data['數量']}^FS"
 
-        # 後續單位
+        # 機台
         zpl_command += f"^FO{x_position},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD後續單位:{data['後續單位']}^FS"
+        zpl_command += f"^FD機台:{data['機台']}^FS"
 
         # 檢驗人
         zpl_command += f"^FO{x_position},{y_position + 500}"
@@ -146,10 +146,10 @@ def print_zebra_label(data):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD淨重:{data['重量']}^FS"
 
-        # 數量
+        # 後續單位
         zpl_command += f"^FO{x_position_right},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD數量:{data['數量']}^FS"
+        zpl_command += f"^FD後續單位:{data['後續單位']}^FS"
 
         # 班別
         zpl_command += f"^FO{x_position_right},{y_position + 500}"

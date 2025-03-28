@@ -332,13 +332,14 @@ function print_box_count() {
                 'boxNumber' => $boxNumber
             ];
             
-            // 8. 檢查條碼是否已存在，如果存在則更新
-            $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 條碼編號 = ?";
+            // 8. 檢查是否有相同日期、工單號、機台、箱數、班別的記錄
+            $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 工單號 = ? AND 機台 = ? AND 箱數 = ? AND 班別 = ? AND 條碼編號 LIKE ?";
             $checkStmt = $pdo->prepare($checkSql);
-            $checkStmt->execute([$barcodeId]);
+            $datePrefix = $date . '%';
+            $checkStmt->execute([$workOrder, $car, $boxNumber, $shift, $datePrefix]);
             
             if ($checkStmt->rowCount() == 0) {
-                // 條碼不存在，新增記錄
+                // 記錄不存在，新增記錄
                 // 檢查是否需要新增後續單位欄位
                 $columnExists = false;
                 try {
@@ -376,7 +377,9 @@ function print_box_count() {
                     }
                 }
             } else {
-                // 條碼已存在，更新記錄
+                // 記錄已存在，更新記錄
+                $existingBarcode = $checkStmt->fetchColumn();
+                
                 // 檢查是否有後續單位欄位
                 $columnExists = false;
                 try {
@@ -392,14 +395,14 @@ function print_box_count() {
                                 SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
                                 WHERE 條碼編號 = ?";
                     $updateStmt = $pdo->prepare($updateSql);
-                    $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
+                    $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $existingBarcode]);
                 } else {
                     // 不包含後續單位
                     $updateSql = "UPDATE 生產紀錄表 
                                 SET 品名 = ?, 顧車 = ?, 班別 = ? 
                                 WHERE 條碼編號 = ?";
                     $updateStmt = $pdo->prepare($updateSql);
-                    $updateStmt->execute([$productName, $operator, $shift, $barcodeId]);
+                    $updateStmt->execute([$productName, $operator, $shift, $existingBarcode]);
                 }
             }
         }
@@ -495,10 +498,11 @@ function reprintBarcode() {
         // 構建條碼編號
         $barcodeId = $date . $workOrder . $car . $shiftNumber . $boxNumber;
         
-        // 檢查新格式條碼是否存在
-        $checkNewSql = "SELECT * FROM 生產紀錄表 WHERE 條碼編號 = ?";
+        // 檢查是否有相同日期、工單號、機台、箱數、班別的記錄
+        $checkNewSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 工單號 = ? AND 機台 = ? AND 箱數 = ? AND 班別 = ? AND 條碼編號 LIKE ?";
         $checkNewStmt = $pdo->prepare($checkNewSql);
-        $checkNewStmt->execute([$barcodeId]);
+        $datePrefix = $date . '%';
+        $checkNewStmt->execute([$workOrder, $car, $boxNumber, $shift, $datePrefix]);
         
         // 如果新格式條碼不存在，檢查舊格式
         if ($checkNewStmt->rowCount() == 0) {
@@ -529,9 +533,13 @@ function reprintBarcode() {
                     $insertStmt = $pdo->prepare($insertSql);
                     $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
                 }
+                
+                // 使用新創建的條碼編號
+                $existingBarcode = $barcodeId;
             } else {
                 // 使用舊格式條碼
-                $barcodeId = $oldBarcodeId;
+                $existingRecord = $checkOldStmt->fetch(PDO::FETCH_ASSOC);
+                $existingBarcode = $existingRecord['條碼編號'];
                 
                 // 更新舊記錄
                 $columnExists = false;
@@ -547,16 +555,19 @@ function reprintBarcode() {
                                 SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
                                 WHERE 條碼編號 = ?";
                     $updateStmt = $pdo->prepare($updateSql);
-                    $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
+                    $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $existingBarcode]);
                 } else {
                     $updateSql = "UPDATE 生產紀錄表 
                                 SET 品名 = ?, 顧車 = ?, 班別 = ? 
                                 WHERE 條碼編號 = ?";
                     $updateStmt = $pdo->prepare($updateSql);
-                    $updateStmt->execute([$productName, $operator, $shift, $barcodeId]);
+                    $updateStmt->execute([$productName, $operator, $shift, $existingBarcode]);
                 }
             }
         } else {
+            // 使用找到的記錄
+            $existingBarcode = $checkNewStmt->fetchColumn();
+            
             // 更新記錄信息
             $columnExists = false;
             try {
@@ -571,19 +582,19 @@ function reprintBarcode() {
                             SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
                             WHERE 條碼編號 = ?";
                 $updateStmt = $pdo->prepare($updateSql);
-                $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
+                $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $existingBarcode]);
             } else {
                 $updateSql = "UPDATE 生產紀錄表 
                             SET 品名 = ?, 顧車 = ?, 班別 = ? 
                             WHERE 條碼編號 = ?";
                 $updateStmt = $pdo->prepare($updateSql);
-                $updateStmt->execute([$productName, $operator, $shift, $barcodeId]);
+                $updateStmt->execute([$productName, $operator, $shift, $existingBarcode]);
             }
         }
         
-        // 無論如何，使用當前的條碼ID列印
+        // 無論如何，使用找到或創建的條碼ID列印
         $command = '"' . PYTHON_PATH . '" "' . BARCODE_SCRIPT_PATH . '" ' . 
-                  escapeshellarg($barcodeId) . " " . 
+                  escapeshellarg($existingBarcode) . " " . 
                   escapeshellarg($workOrder) . " " . 
                   escapeshellarg($productName) . " " . 
                   escapeshellarg($operator) . " " . 

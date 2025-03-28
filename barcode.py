@@ -58,8 +58,8 @@ def print_zebra_label(data, barcode_id):
         date_str = barcode_id[:8]
             # try:
                 # 假設條碼編號前8碼格式為YYYYMMDD
-                date_obj = datetime.datetime.strptime(date_str, "%Y%m%d")
-                formatted_date = date_obj.strftime("%Y/%m/%d")
+        date_obj = datetime.datetime.strptime(date_str, "%Y%m%d")
+        formatted_date = date_obj.strftime("%Y/%m/%d")
             # except ValueError:
             #     # 如果解析失敗，使用當前日期
             #     logging.warning(f"無法從條碼編號 {barcode_id} 解析日期，使用當前日期")
@@ -72,7 +72,7 @@ def print_zebra_label(data, barcode_id):
         # 定義標籤參數
         # XY軸位置
         x_position = 60
-        x_position_right = 670
+        x_position_right = 650
         y_position = 50
 
         # 條碼高度和模組寬度
@@ -131,12 +131,12 @@ def print_zebra_label(data, barcode_id):
         zpl_command += f"^FD機台:{data['機台']}^FS"
 
         # 箱數
-        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 300}"
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD箱數:{data['箱數']}^FS"
 
         # 班別
-        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 400}"
+        zpl_command += f"^FO{350},{y_position + barcode_height + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD班別:{data['班別']}^FS"
 
