@@ -6,6 +6,8 @@
   <title>系統管理</title>
   <script src="js/vue.min.js"></script>
   <script src="js/scripts.js"></script>
+  <!-- 新增 XLSX 庫引入 -->
+  <script src="js/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -135,7 +137,7 @@
           <!-- 顯示 uploaded_data 資料表所有資料 -->
           <h3>上傳後資料列表</h3>
           <button @click="fetchUploadedData">刷新資料</button>
-          <table class="data-table" v-if="uploadedData.length">
+          <table class="data-table" v-if="filteredData.length">
             <thead>
               <tr>
                 <th>工單號</th>
@@ -158,7 +160,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, idx) in uploadedData" :key="idx">
+              <tr v-for="(item, idx) in filteredData" :key="idx">
                 <td>{{ item.工單號 }}</td>
                 <td>{{ item.料號 }}</td>
                 <td>{{ item.品名 }}</td>
@@ -220,6 +222,10 @@
         currentPageUrl() {
           const timestamp = new Date().getTime();
           return `${this.currentPage}.html?t=${timestamp}`;
+        },
+        // 新增過濾狀態為0的資料的計算屬性
+        filteredData() {
+          return this.uploadedData.filter(item => item.狀態 != '0');
         }
       },
       mounted() {
@@ -276,6 +282,8 @@
         },
         async handleFile(event) {
           this.file = event.target.files[0];
+          if (!this.file) return; // 防止未選擇檔案時觸發
+          
           let reader = new FileReader();
           reader.onload = async (e) => {
             let data = new Uint8Array(e.target.result);

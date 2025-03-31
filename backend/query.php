@@ -135,7 +135,7 @@ function getActualWorkOrder($car, $pdo) {
     }
 }
 
-// 獲取所有工單的函數 (原本已經存在，但調整了SQL查詢)
+// 獲取所有工單的函數 (修改SQL查詢，添加狀態不為0的條件)
 function getWorkOrders() {
     // 引入數據庫連接配置
     require_once 'config.php';
@@ -147,8 +147,8 @@ function getWorkOrders() {
     header('Access-Control-Allow-Headers: Content-Type');
 
     try {
-        // 查詢工單資料
-        $sql = "SELECT 工單號, 品名 FROM uploaded_data WHERE 工單號 IS NOT NULL AND 工單號 <> '' GROUP BY 工單號, 品名 ORDER BY 工單號";
+        // 查詢工單資料，添加狀態不為0的條件
+        $sql = "SELECT 工單號, 品名 FROM uploaded_data WHERE 工單號 IS NOT NULL AND 工單號 <> '' AND 狀態 != 0 GROUP BY 工單號, 品名 ORDER BY 工單號";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
         $workOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);

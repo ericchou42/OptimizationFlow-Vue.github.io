@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>車台查詢系統</title>
     <link href="css/styles.css" rel="stylesheet">
+    <!-- 添加 Select2 的 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         /* 基本頁面樣式 */
         body {
@@ -158,7 +160,7 @@
             <div v-if="!loading && !error">
                 <!-- 搜尋欄位 -->
                 <div class="mb-3">
-                    <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋車台或工單號...">
+                    <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋車台">
                 </div>
                 
                 <!-- 表格區域，使用容器允許水平滾動 -->
@@ -225,6 +227,12 @@
     <script src="js/vue.min.js"></script>
     <script src="js/scripts.js"></script>
     <script src="js/axios.min.js"></script>
+    <!-- 添加 jQuery (Select2 需要) -->
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <!-- 添加 Select2 的 JS -->
+    <script src="js/select2.min.js"></script>
+    <!-- 添加 Select2 的中文語言包 -->
+    <script src="js/zh-TW.js"></script>
     <script>
         const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
@@ -337,7 +345,26 @@ const initializeSelectDropdowns = () => {
             
             selectElement.select2({
                 placeholder: '請選擇工單',
-                allowClear: true
+                allowClear: true,
+                minimumInputLength: 0, // 允許不輸入字符也顯示所有選項
+                minimumResultsForSearch: 0, // 確保搜尋功能始終啟用
+                width: '100%', // 確保寬度正確
+                dropdownParent: selectElement.parent(), // 確保下拉列表在正確的位置
+                language: 'zh-TW', // 使用中文
+                matcher: function(params, data) {
+                    // 如果沒有搜尋詞，返回所有數據
+                    if ($.trim(params.term) === '') {
+                        return data;
+                    }
+                    
+                    // 如果搜尋詞不為空，則進行模糊匹配
+                    if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
+                        return data;
+                    }
+                    
+                    // 如果沒有匹配，返回 null
+                    return null;
+                }
             });
             
             // 確保 Select2 的變更能夠同步到 Vue 的資料模型
