@@ -86,16 +86,16 @@
             white-space: nowrap; /* 避免日期換行 */
         }
         /* 狀態欄位樣式 */
-.status-cell {
-    width: 15%;
-    text-align: center;
-}
+        .status-cell {
+            width: 15%;
+            text-align: center;
+        }
 
-/* 狀態下拉選單樣式 */
-.status-select {
-    width: 100%;
-    font-size: 0.9rem;
-}
+        /* 狀態下拉選單樣式 */
+        .status-select {
+            width: 100%;
+            font-size: 0.9rem;
+        }
         /* 表格容器設定，允許水平滾動 */
         .table-container {
             width: 100%;
@@ -120,6 +120,13 @@
             font-size: 0.8rem;
             padding: 2px 5px;
             margin-left: 5px;
+        }
+        
+        /* 全局儲存按鈕樣式 */
+        .global-save-btn {
+            margin: 10px 0;
+            padding: 8px 15px;
+            font-size: 1rem;
         }
         
         /* 修改成功樣式 */
@@ -163,6 +170,13 @@
                     <input v-model="searchTerm" type="text" class="form-control" placeholder="搜尋車台">
                 </div>
                 
+                <!-- 新增全局儲存按鈕 -->
+                <div class="mb-3">
+                    <button @click="saveAllWorkOrders" class="btn btn-primary global-save-btn">
+                        儲存全部更改
+                    </button>
+                </div>
+                
                 <!-- 表格區域，使用容器允許水平滾動 -->
                 <div class="table-container">
                     <!-- 重新設計的主表格，使用table-layout: auto自動調整寬度 -->
@@ -174,7 +188,6 @@
                                 <th>狀態</th>
                                 <th>工單號</th>
                                 <th>工單(預)</th>
-                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -183,7 +196,15 @@
                                 <tr :id="`row-${item.car}`">
                                     <td class="car-cell">{{ item.car }}</td>
                                     <td class="status-cell">
-                                        {{ item.currentStatus }} - {{ getMachineStatusName(item.currentStatus) }}
+                                        <select :id="`machine-status-${item.car}`" 
+                                                class="form-control status-select"
+                                                v-model="item.currentStatus">
+                                            <option v-for="status in machineStatuses" 
+                                                    :key="status.id" 
+                                                    :value="status.id">
+                                                {{ status.id }} - {{ status.status_name }}
+                                            </option>
+                                        </select>
                                     </td>
                                     <td class="workorder-cell">
                                         <select :id="`workorder-${item.car}`" 
@@ -208,12 +229,6 @@
                                             </div>
                                         </div>
                                         <div v-else>無預排工單</div>
-                                    </td>
-                                    <td>
-                                        <button @click="saveWorkOrder(item.car)" 
-                                                class="btn btn-sm btn-primary">
-                                            儲存
-                                        </button>
                                     </td>
                                 </tr>
                             </template>
@@ -240,13 +255,13 @@
             setup() {
                 // 狀態變數
                 const data = ref([]);
-const loading = ref(true);
-const error = ref(null);
-const searchTerm = ref('');
-const workOrders = ref([]);
-const machineStatuses = ref([]);
-const message = ref('');
-const messageType = ref('');
+                const loading = ref(true);
+                const error = ref(null);
+                const searchTerm = ref('');
+                const workOrders = ref([]);
+                const machineStatuses = ref([]);
+                const message = ref('');
+                const messageType = ref('');
                 
                 // 搜尋過濾功能
                 const filteredData = computed(() => {
@@ -306,116 +321,145 @@ const messageType = ref('');
                     }
                 };
 
-// 獲取機台狀態下拉選單資料
-const fetchMachineStatuses = async () => {
-    try {
-        const response = await axios.get('./backend/query.php?action=get_machine_status');
-        if (response.data.error) {
-            error.value = response.data.error;
-        } else {
-            machineStatuses.value = response.data;
-        }
-    } catch (err) {
-        error.value = `獲取機台狀態數據失敗: ${err.message}`;
-    }
-};
-
-// 獲取工單下拉選單資料
-const fetchWorkOrders = async () => {
-    try {
-        const response = await axios.get('./backend/query.php?action=get_work_orders');
-        if (response.data.error) {
-            error.value = response.data.error;
-        } else {
-            workOrders.value = response.data;
-        }
-    } catch (err) {
-        error.value = `獲取工單數據失敗: ${err.message}`;
-    }
-};
-                
-// 初始化下拉選單
-const initializeSelectDropdowns = () => {
-    nextTick(() => {
-        // 初始化工單下拉選單
-        $('.workorder-select').each(function() {
-            const selectElement = $(this);
-            const carId = selectElement.attr('id').split('-')[1];
-            const item = data.value.find(i => i.car === carId);
-            
-            selectElement.select2({
-                placeholder: '請選擇工單',
-                allowClear: true,
-                minimumInputLength: 0, // 允許不輸入字符也顯示所有選項
-                minimumResultsForSearch: 0, // 確保搜尋功能始終啟用
-                width: '100%', // 確保寬度正確
-                dropdownParent: selectElement.parent(), // 確保下拉列表在正確的位置
-                language: 'zh-TW', // 使用中文
-                matcher: function(params, data) {
-                    // 如果沒有搜尋詞，返回所有數據
-                    if ($.trim(params.term) === '') {
-                        return data;
+                // 獲取機台狀態下拉選單資料
+                const fetchMachineStatuses = async () => {
+                    try {
+                        const response = await axios.get('./backend/query.php?action=get_machine_status');
+                        if (response.data.error) {
+                            error.value = response.data.error;
+                        } else {
+                            machineStatuses.value = response.data;
+                        }
+                    } catch (err) {
+                        error.value = `獲取機台狀態數據失敗: ${err.message}`;
                     }
-                    
-                    // 如果搜尋詞不為空，則進行模糊匹配
-                    if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
-                        return data;
+                };
+
+                // 獲取工單下拉選單資料
+                const fetchWorkOrders = async () => {
+                    try {
+                        const response = await axios.get('./backend/query.php?action=get_work_orders');
+                        if (response.data.error) {
+                            error.value = response.data.error;
+                        } else {
+                            workOrders.value = response.data;
+                        }
+                    } catch (err) {
+                        error.value = `獲取工單數據失敗: ${err.message}`;
                     }
-                    
-                    // 如果沒有匹配，返回 null
-                    return null;
-                }
-            });
-            
-            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
-            selectElement.on('change', function() {
-                if (item) {
-                    item.currentWorkOrder = selectElement.val();
-                }
-            });
-        });
-        
-        // 初始化狀態下拉選單
-        $('.status-select').each(function() {
-            const selectElement = $(this);
-            const carId = selectElement.attr('id').split('-')[2];
-            const item = data.value.find(i => i.car === carId);
-            
-            selectElement.select2({
-                placeholder: '請選擇狀態',
-                allowClear: true
-            });
-            
-            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
-            selectElement.on('change', function() {
-                if (item) {
-                    item.currentStatus = selectElement.val();
-                }
-            });
-        });
-    });
-};
+                };
                 
-// 儲存工單資料
-const saveWorkOrder = async (car) => {
-    const item = data.value.find(i => i.car === car);
-    if (!item) return;
+                // 初始化下拉選單
+                const initializeSelectDropdowns = () => {
+                    nextTick(() => {
+                        // 初始化工單下拉選單
+                        $('.workorder-select').each(function() {
+                            const selectElement = $(this);
+                            const carId = selectElement.attr('id').split('-')[1];
+                            const item = data.value.find(i => i.car === carId);
+                            
+                            selectElement.select2({
+                                placeholder: '請選擇工單',
+                                allowClear: true,
+                                minimumInputLength: 0, // 允許不輸入字符也顯示所有選項
+                                minimumResultsForSearch: 0, // 確保搜尋功能始終啟用
+                                width: '100%', // 確保寬度正確
+                                dropdownParent: selectElement.parent(), // 確保下拉列表在正確的位置
+                                language: 'zh-TW', // 使用中文
+                                matcher: function(params, data) {
+                                    // 如果沒有搜尋詞，返回所有數據
+                                    if ($.trim(params.term) === '') {
+                                        return data;
+                                    }
+                                    
+                                    // 如果搜尋詞不為空，則進行模糊匹配
+                                    if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
+                                        return data;
+                                    }
+                                    
+                                    // 如果沒有匹配，返回 null
+                                    return null;
+                                }
+                            });
+                            
+                            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
+                            selectElement.on('change', function() {
+                                if (item) {
+                                    item.currentWorkOrder = selectElement.val();
+                                }
+                            });
+                        });
+                        
+                        // 初始化狀態下拉選單
+                        $('.status-select').each(function() {
+                            const selectElement = $(this);
+                            const carId = selectElement.attr('id').split('-')[2];
+                            const item = data.value.find(i => i.car === carId);
+                            
+                            selectElement.select2({
+                                placeholder: '請選擇狀態',
+                                allowClear: false
+                            });
+                            
+                            // 確保 Select2 的變更能夠同步到 Vue 的資料模型
+                            selectElement.on('change', function() {
+                                if (item) {
+                                    item.currentStatus = selectElement.val();
+                                }
+                            });
+                        });
+                    });
+                };
+                
+                // 儲存單個工單資料 (保留此功能以備不時之需)
+                const saveWorkOrder = async (car) => {
+                    const item = data.value.find(i => i.car === car);
+                    if (!item) return;
 
-    try {
-        const response = await axios.post('./backend/query.php?action=save_work_order', {
-            car: car,
-            workOrder: item.currentWorkOrder
-        });
+                    try {
+                        const response = await axios.post('./backend/query.php?action=save_work_order', {
+                            car: car,
+                            status: item.currentStatus,
+                            workOrder: item.currentWorkOrder
+                        });
 
-        if (response.data.success) {
-            showMessage('更新成功', 'alert-success');
-        } else {
-            showMessage(response.data.error, 'alert-danger');
-        }
-    } catch (err) {
-        showMessage(`儲存失敗: ${err.message}`, 'alert-danger');
-    }
-};
+                        if (response.data.success) {
+                            showMessage('更新成功', 'alert-success');
+                        } else {
+                            showMessage(response.data.error, 'alert-danger');
+                        }
+                    } catch (err) {
+                        showMessage(`儲存失敗: ${err.message}`, 'alert-danger');
+                    }
+                };
+                
+                // 儲存所有工單資料
+                const saveAllWorkOrders = async () => {
+                    try {
+                        loading.value = true;
+                        
+                        // 準備要更新的資料
+                        const updateData = data.value.map(item => ({
+                            car: item.car,
+                            status: item.currentStatus,
+                            workOrder: item.currentWorkOrder
+                        }));
+                        
+                        const response = await axios.post('./backend/query.php?action=save_all_work_orders', {
+                            updates: updateData
+                        });
+                        
+                        if (response.data.success) {
+                            showMessage('所有資料更新成功', 'alert-success');
+                        } else {
+                            showMessage(response.data.error || '更新失敗', 'alert-danger');
+                        }
+                    } catch (err) {
+                        showMessage(`儲存失敗: ${err.message}`, 'alert-danger');
+                    } finally {
+                        loading.value = false;
+                    }
+                };
                 
                 // 顯示訊息
                 const showMessage = (msg, type) => {
@@ -436,37 +480,38 @@ const saveWorkOrder = async (car) => {
                     // 注意：表格已經通過CSS的table-layout: auto實現了大部分自動調整
                 };
                 
-// 頁面載入時獲取數據
-onMounted(() => {
-    fetchMachineStatuses().then(() => {
-        fetchWorkOrders().then(() => {
-            fetchData();
-        });
-    });
-    
-    // 添加窗口大小變化監聽器，以便在瀏覽器大小改變時重新調整表格
-    window.addEventListener('resize', adjustTableColumns);
-});
+                // 頁面載入時獲取數據
+                onMounted(() => {
+                    fetchMachineStatuses().then(() => {
+                        fetchWorkOrders().then(() => {
+                            fetchData();
+                        });
+                    });
+                    
+                    // 添加窗口大小變化監聽器，以便在瀏覽器大小改變時重新調整表格
+                    window.addEventListener('resize', adjustTableColumns);
+                });
 
-const getMachineStatusName = (statusId) => {
-    const status = machineStatuses.value.find(s => s.id === statusId);
-    return status ? status.status_name : '';
-};
+                const getMachineStatusName = (statusId) => {
+                    const status = machineStatuses.value.find(s => s.id === statusId);
+                    return status ? status.status_name : '';
+                };
 
-return {
-    data,
-    loading,
-    error,
-    searchTerm,
-    filteredData,
-    isHighlighted,
-    saveWorkOrder,
-    message,
-    messageType,
-    machineStatuses,
-    workOrders,
-    getMachineStatusName
-};
+                return {
+                    data,
+                    loading,
+                    error,
+                    searchTerm,
+                    filteredData,
+                    isHighlighted,
+                    saveWorkOrder,
+                    saveAllWorkOrders,
+                    message,
+                    messageType,
+                    machineStatuses,
+                    workOrders,
+                    getMachineStatusName
+                };
             }
         });
 

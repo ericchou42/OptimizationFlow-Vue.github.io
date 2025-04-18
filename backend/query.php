@@ -9,6 +9,9 @@ switch ($action) {
     case 'save_work_order':
         saveWorkOrder();
         break;
+    case 'save_all_work_orders':
+        saveAllWorkOrders();
+        break;
     case 'get_machine_status':
         getMachineStatus();
         break;
@@ -175,11 +178,12 @@ function saveWorkOrder() {
 
     try {
         $sql = "UPDATE 機台看板 
-                SET 工單號 = ?
+                SET 工單號 = ?, 狀態 = ?
                 WHERE 機台 = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             $data['workOrder'] ?? null,
+            $data['status'] ?? 'B',
             $data['car']
         ]);
 
@@ -189,6 +193,64 @@ function saveWorkOrder() {
         ]);
 
     } catch (PDOException $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => '更新失敗: ' . $e->getMessage()
+        ]);
+    }
+}
+
+// 批量保存工單的函數
+function saveAllWorkOrders() {
+    require_once 'config.php';
+    header('Content-Type: application/json');
+
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($data['updates']) || !is_array($data['updates'])) {
+        echo json_encode(['success' => false, 'error' => '缺少必要參數或格式不正確']);
+        return;
+    }
+
+    try {
+        // 開始交易
+        $pdo->beginTransaction();
+        
+        $sql = "UPDATE 機台看板 
+                SET 工單號 = ?, 狀態 = ?
+                WHERE 機台 = ?";
+        $stmt = $pdo->prepare($sql);
+        
+        // 批量執行更新
+        $successCount = 0;
+        $totalCount = count($data['updates']);
+        
+        foreach ($data['updates'] as $update) {
+            if (!isset($update['car'])) continue;
+            
+            $stmt->execute([
+                $update['workOrder'] ?? null,
+                $update['status'] ?? 'B',
+                $update['car']
+            ]);
+            
+            $successCount++;
+        }
+        
+        // 提交交易
+        $pdo->commit();
+        
+        echo json_encode([
+            'success' => true,
+            'message' => "更新成功，共更新 $successCount/$totalCount 筆資料"
+        ]);
+
+    } catch (PDOException $e) {
+        // 發生錯誤時回滾交易
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        
         echo json_encode([
             'success' => false,
             'error' => '更新失敗: ' . $e->getMessage()

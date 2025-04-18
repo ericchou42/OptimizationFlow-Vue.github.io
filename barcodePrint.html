@@ -178,6 +178,12 @@
             margin-top: 10px;
         }
         
+        .area-controls .area-action-container {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
         .box-count-input {
             width: 60px;
             text-align: center;
@@ -191,6 +197,17 @@
         
         .box-count-btns button {
             margin-right: 10px;
+        }
+        
+        /* 高亮選中的區域 */
+        .highlight {
+            background-color: #e7f3fe;
+        }
+        
+        /* 區域批量列印按鈕 */
+        .area-print-btn {
+            margin-top: 10px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -229,12 +246,12 @@
                 <div class="area-controls">
                     <div class="row">
                         <div class="col-12">
-                            <label>選擇機台區域批量修改顧車人員：</label>
+                            <label>選擇機台區域批量操作：</label>
                             <div>
-                                <button @click="selectArea('A')" class="btn btn-outline-success area-btn">A區</button>
-                                <button @click="selectArea('B')" class="btn btn-outline-success area-btn">B區</button>
-                                <button @click="selectArea('C')" class="btn btn-outline-success area-btn">C區</button>
-                                <button @click="selectArea('F')" class="btn btn-outline-success area-btn">F區</button>
+                                <button @click="selectArea('A')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'A', 'btn-outline-success': selectedArea !== 'A'}">A區</button>
+                                <button @click="selectArea('B')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'B', 'btn-outline-success': selectedArea !== 'B'}">B區</button>
+                                <button @click="selectArea('C')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'C', 'btn-outline-success': selectedArea !== 'C'}">C區</button>
+                                <button @click="selectArea('F')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'F', 'btn-outline-success': selectedArea !== 'F'}">F區</button>
                             </div>
                         </div>
                     </div>
@@ -246,6 +263,18 @@
                                     {{ operator }}
                                 </option>
                             </select>
+                        </div>
+                        
+                        <!-- 新增區域批量列印按鈕和操作 -->
+                        <div class="col-12 area-action-container" v-if="selectedArea">
+                            <button @click="printAreaBarcodes" 
+                                    class="btn btn-lg btn-danger area-print-btn"
+                                    :disabled="!canPrintSelectedArea">
+                                批量列印 {{ selectedArea }}區 條碼 ({{ selectedAreaMachineCount }} 台)
+                            </button>
+                            <div v-if="!canPrintSelectedArea" class="alert alert-warning mt-2">
+                                請確保選擇的區域中所有機台都有工單號、顧車人員和日期
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -286,7 +315,6 @@
                                 <th>班別</th>
                                 <th>後續單位</th>
                                 <th>箱數</th>
-                                <th>批量列印</th>
                                 <th>列印箱號</th>
                                 <th>單張列印</th>
                             </tr>
@@ -323,13 +351,6 @@
                                     </td>
                                     <td>
                                         <input type="number" v-model="item.boxCount" class="form-control box-count-input" min="1" max="9" @change="validateBoxCount(item)">
-                                    </td>
-                                    <td>
-                                        <button @click="batchPrintBarcode(item)" 
-                                                class="btn btn-sm btn-primary"
-                                                :disabled="!item.currentWorkOrder || !item.operator || !item.barcodeDate || !isValidBoxCount(item)">
-                                            列印
-                                        </button>
                                     </td>
                                     <td>
                                         <select v-model="item.reprintBoxCount" class="form-control">
@@ -369,6 +390,9 @@
                 
                 <h4>現有箱數</h4>
                 <pre>{{ JSON.stringify(existingBoxes, null, 2) }}</pre>
+                
+                <h4>選中區域機台數量</h4>
+                <pre>{{ selectedAreaMachineCount }}</pre>
             </div>
         </div>
     </div>
@@ -549,26 +573,22 @@
                     }
                 };
 
-                // 批量列印條碼
+                // 批量列印條碼 (單個機台) - 保留此函數供內部使用
                 const batchPrintBarcode = async (item) => {
                     if (!item.currentWorkOrder) {
-                        showMessage('無工單號，無法列印', 'alert-danger');
-                        return;
+                        return { success: false, message: '無工單號，無法列印' };
                     }
                     
                     if (!item.operator) {
-                        showMessage('請選擇僱車人員', 'alert-danger');
-                        return;
+                        return { success: false, message: '請選擇僱車人員' };
                     }
                     
                     if (!item.barcodeDate) {
-                        showMessage('請選擇日期', 'alert-danger');
-                        return;
+                        return { success: false, message: '請選擇日期' };
                     }
                     
                     if (!isValidBoxCount(item)) {
-                        showMessage('箱數無效，必須是1-3之間的數字', 'alert-danger');
-                        return;
+                        return { success: false, message: '箱數無效，必須是1-9之間的數字' };
                     }
                     
                     try {
@@ -589,17 +609,92 @@
                         });
                         
                         if (printResponse.data.success) {
-                            showMessage(`批量列印成功，共 ${boxCount} 張標籤`, 'alert-success');
-                            
                             // 更新本地狀態
                             await checkExistingBoxes(item);
+                            return { 
+                                success: true, 
+                                message: `機台 ${item.car} 批量列印成功，共 ${boxCount} 張標籤` 
+                            };
                         } else {
-                            showMessage(printResponse.data.error || '列印失敗', 'alert-danger');
+                            return { 
+                                success: false, 
+                                message: `機台 ${item.car} 列印失敗: ${printResponse.data.error || '未知錯誤'}` 
+                            };
                         }
                         
                     } catch (err) {
-                        showMessage(`列印失敗: ${err.message}`, 'alert-danger');
+                        return { 
+                            success: false, 
+                            message: `機台 ${item.car} 列印失敗: ${err.message}` 
+                        };
                     }
+                };
+                
+                // 新增區域批量列印功能
+                const printAreaBarcodes = async () => {
+                    if (!selectedArea.value) {
+                        showMessage('請先選擇一個機台區域', 'alert-danger');
+                        return;
+                    }
+                    
+                    // 獲取該區域的所有機台
+                    const areaMachines = filteredData.value.filter(item => 
+                        item.car.startsWith(selectedArea.value)
+                    );
+                    
+                    if (areaMachines.length === 0) {
+                        showMessage(`${selectedArea.value}區沒有狀態為 '1' 的機台`, 'alert-danger');
+                        return;
+                    }
+                    
+                    // 檢查所有機台是否都有工單和顧車人員
+                    const invalidMachines = areaMachines.filter(item => 
+                        !item.currentWorkOrder || !item.operator || !item.barcodeDate || !isValidBoxCount(item)
+                    );
+                    
+                    if (invalidMachines.length > 0) {
+                        const machineList = invalidMachines.map(m => m.car).join(', ');
+                        showMessage(`以下機台缺少必要資料: ${machineList}`, 'alert-danger');
+                        return;
+                    }
+                    
+                    // 開始批量列印
+                    loading.value = true;
+                    showMessage(`正在為 ${selectedArea.value}區 批量列印 ${areaMachines.length} 台機台的條碼...`, 'alert-info');
+                    
+                    const results = [];
+                    const successes = [];
+                    const failures = [];
+                    
+                    for (const machine of areaMachines) {
+                        const result = await batchPrintBarcode(machine);
+                        results.push(result);
+                        
+                        if (result.success) {
+                            successes.push(machine.car);
+                        } else {
+                            failures.push({ car: machine.car, error: result.message });
+                        }
+                    }
+                    
+                    loading.value = false;
+                    
+                    // 顯示結果摘要
+                    if (failures.length === 0) {
+                        showMessage(`成功列印 ${selectedArea.value}區所有 ${successes.length} 台機台的條碼`, 'alert-success');
+                    } else if (successes.length === 0) {
+                        showMessage(`所有 ${failures.length} 台機台列印失敗`, 'alert-danger');
+                    } else {
+                        showMessage(`部分列印成功: ${successes.length} 台成功，${failures.length} 台失敗`, 'alert-warning');
+                    }
+                    
+                    // 在除錯區域顯示詳細信息
+                    debugApiResponse.value = JSON.stringify({
+                        area: selectedArea.value,
+                        total: areaMachines.length,
+                        successes,
+                        failures
+                    }, null, 2);
                 };
 
                 // 單張重印功能
@@ -650,6 +745,33 @@
                 const filteredData = computed(() => {
                     if (!Array.isArray(data.value)) return [];
                     return data.value.filter(item => item.currentStatus === '1');
+                });
+                
+                // 計算選中區域的機台數量
+                const selectedAreaMachineCount = computed(() => {
+                    if (!selectedArea.value || !Array.isArray(filteredData.value)) return 0;
+                    return filteredData.value.filter(item => 
+                        item.car.startsWith(selectedArea.value)
+                    ).length;
+                });
+                
+                // 判斷選中區域是否可以列印
+                const canPrintSelectedArea = computed(() => {
+                    if (!selectedArea.value || !Array.isArray(filteredData.value) || selectedAreaMachineCount.value === 0) {
+                        return false;
+                    }
+                    
+                    // 檢查選中區域的所有機台是否有必要資料
+                    const areaMachines = filteredData.value.filter(item => 
+                        item.car.startsWith(selectedArea.value)
+                    );
+                    
+                    return areaMachines.every(item => 
+                        item.currentWorkOrder && 
+                        item.operator && 
+                        item.barcodeDate && 
+                        isValidBoxCount(item)
+                    );
                 });
                 
                 // 修正過的 fetchData 函數
@@ -793,7 +915,6 @@
                     message,
                     messageType,
                     machineStatuses,
-                    batchPrintBarcode,
                     reprintBarcode,
                     debugApiResponse,
                     showDebugInfo,
@@ -812,7 +933,10 @@
                     selectedArea,
                     areaOperator,
                     selectArea,
-                    setAreaOperator
+                    setAreaOperator,
+                    selectedAreaMachineCount,
+                    canPrintSelectedArea,
+                    printAreaBarcodes
                 };
             }
         });
