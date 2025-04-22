@@ -49,6 +49,24 @@ def get_work_order_data(connection, work_order_number):
         print(f"查詢錯誤: {e}")
         return None
 
+# 新增文字換行函數
+def wrap_text(text, max_length):
+    """將文字按最大長度分割為多行"""
+    if len(text) <= max_length:
+        return [text]
+    
+    lines = []
+    while len(text) > 0:
+        if len(text) <= max_length:
+            lines.append(text)
+            break
+        
+        # 對於中文等無空格的文字，直接在最大長度處截斷
+        lines.append(text[:max_length])
+        text = text[max_length:]
+    
+    return lines
+
 def print_zebra_label(data, barcode_id):
     try:
         logging.info(f"準備列印標籤: {data}")
@@ -110,33 +128,45 @@ def print_zebra_label(data, barcode_id):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD工單號:{data['工單號']}^FS"
 
-        # 品名
-        zpl_command += f"^FO{x_position},{y_position + barcode_height + 300}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD品名:{data['品名']}^FS"
-
-        # 人員
-        zpl_command += f"^FO{x_position},{y_position + barcode_height + 400}"
+        # 品名自動換行處理 - 限制最多兩行(300和400位置)
+        full_text = f"品名:{data['品名']}"
+        max_length = 25  # 每行最大字符數，可以根據需要調整
+        wrapped_lines = wrap_text(full_text, max_length)
+        
+        # 如果超過兩行，只取前兩行
+        if len(wrapped_lines) > 2:
+            wrapped_lines = wrapped_lines[:2]
+        
+        # 打印每一行，300和400兩行位置
+        line_positions = [300, 400]
+        for i, line in enumerate(wrapped_lines):
+            if i < len(line_positions):  # 確保不超過預定的行數
+                zpl_command += f"^FO{x_position},{y_position + barcode_height + line_positions[i]}"
+                zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+                zpl_command += f"^FD{line}^FS"
+        
+        # 固定顧車位置在y軸500
+        zpl_command += f"^FO{x_position},{y_position + barcode_height + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD顧車:{data['顧車']}^FS"
 
-        # 工序
+        # 工序 - 保持原來的位置
         zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 100}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD工序:10^FS"
 
-        # 機台
+        # 機台 - 保持原來的位置
         zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 200}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD機台:{data['機台']}^FS"
 
-        # 箱數
-        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 400}"
+        # 箱數 - 固定位置在y軸500
+        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD箱數:{data['箱數']}^FS"
 
-        # 班別
-        zpl_command += f"^FO{350},{y_position + barcode_height + 400}"
+        # 班別 - 固定位置在y軸500
+        zpl_command += f"^FO{350},{y_position + barcode_height + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD班別:{data['班別']}^FS"
 
