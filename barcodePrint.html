@@ -209,6 +209,20 @@
             margin-top: 10px;
             font-weight: bold;
         }
+
+        /* 錯誤訊息容器 */
+        .error-details {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #fff3cd;
+            border-radius: 5px;
+            border: 1px solid #ffeeba;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -296,6 +310,12 @@
             <!-- 訊息通知 -->
             <div v-if="message" class="alert" :class="messageType">
                 {{ message }}
+            </div>
+            
+            <!-- Python 錯誤訊息顯示 -->
+            <div v-if="pythonErrors" class="error-details">
+                <strong>列印錯誤詳情 (資料庫已更新)：</strong>
+                <pre>{{ pythonErrors }}</pre>
             </div>
             
             <!-- 主要內容區域 -->
@@ -417,6 +437,7 @@
                 const batchDate = ref(formatDateForInput(new Date())); // 預設批量日期為今天
                 const selectedArea = ref(''); // 選中的機台區域
                 const areaOperator = ref(''); // 區域選中的顧車人員
+                const pythonErrors = ref(''); // Python錯誤訊息
                 
                 // 顧車人員列表
                 const operators = ref(['黃志強', '吳俊龍', '洪昭南', '陳啟昌', '周堉澤', '李正良', '陳文琪', '林俊男', '劉原良', '楊松川', '郭泳宏', '黃富春', '盧志瑋', '阮文王']); 
@@ -573,22 +594,22 @@
                     }
                 };
 
-                // 批量列印條碼 (單個機台) - 保留此函數供內部使用
+                // 批量列印條碼 (單個機台) - 修改以更好地處理錯誤訊息
                 const batchPrintBarcode = async (item) => {
                     if (!item.currentWorkOrder) {
-                        return { success: false, message: '無工單號，無法列印' };
+                        return { success: false, message: '無工單號，無法列印', dataUpdated: false };
                     }
                     
                     if (!item.operator) {
-                        return { success: false, message: '請選擇僱車人員' };
+                        return { success: false, message: '請選擇僱車人員', dataUpdated: false };
                     }
                     
                     if (!item.barcodeDate) {
-                        return { success: false, message: '請選擇日期' };
+                        return { success: false, message: '請選擇日期', dataUpdated: false };
                     }
                     
                     if (!isValidBoxCount(item)) {
-                        return { success: false, message: '箱數無效，必須是1-9之間的數字' };
+                        return { success: false, message: '箱數無效，必須是1-9之間的數字', dataUpdated: false };
                     }
                     
                     try {
@@ -608,34 +629,45 @@
                             shiftNumber: shiftNum
                         });
                         
+                        // 檢查是否成功
                         if (printResponse.data.success) {
                             // 更新本地狀態
                             await checkExistingBoxes(item);
                             return { 
                                 success: true, 
-                                message: `機台 ${item.car} 批量列印成功，共 ${boxCount} 張標籤` 
+                                message: `機台 ${item.car} 批量列印成功，共 ${boxCount} 張標籤`,
+                                dataUpdated: true
                             };
                         } else {
+                            // 檢查資料庫是否已更新
+                            const dataUpdated = printResponse.data.dataUpdated || false;
+                            
                             return { 
                                 success: false, 
-                                message: `機台 ${item.car} 列印失敗: ${printResponse.data.error || '未知錯誤'}` 
+                                message: `機台 ${item.car} 列印失敗: ${printResponse.data.error || '未知錯誤'}`,
+                                dataUpdated,
+                                pyError: printResponse.data.error || null
                             };
                         }
                         
                     } catch (err) {
                         return { 
                             success: false, 
-                            message: `機台 ${item.car} 列印失敗: ${err.message}` 
+                            message: `機台 ${item.car} 列印失敗: ${err.message}`,
+                            dataUpdated: false
                         };
                     }
                 };
                 
-                // 新增區域批量列印功能
+                // 區域批量列印功能 - 修改以更好地處理錯誤訊息
                 const printAreaBarcodes = async () => {
                     if (!selectedArea.value) {
                         showMessage('請先選擇一個機台區域', 'alert-danger');
                         return;
                     }
+                    
+                    // 清除之前的Python錯誤
+                    pythonErrors.value = '';
                     
                     // 獲取該區域的所有機台
                     const areaMachines = filteredData.value.filter(item => 
@@ -665,6 +697,7 @@
                     const results = [];
                     const successes = [];
                     const failures = [];
+                    const dataUpdatedButPrintFailed = [];
                     
                     for (const machine of areaMachines) {
                         const result = await batchPrintBarcode(machine);
@@ -673,19 +706,66 @@
                         if (result.success) {
                             successes.push(machine.car);
                         } else {
-                            failures.push({ car: machine.car, error: result.message });
+                            if (result.dataUpdated) {
+                                // 資料庫已更新但列印失敗
+                                dataUpdatedButPrintFailed.push({
+                                    car: machine.car, 
+                                    error: result.pyError || '未知錯誤'
+                                });
+                            } else {
+                                // 完全失敗
+                                failures.push({
+                                    car: machine.car, 
+                                    error: result.message
+                                });
+                            }
                         }
                     }
                     
                     loading.value = false;
                     
-                    // 顯示結果摘要
-                    if (failures.length === 0) {
+                    // 顯示結果摘要 - 優化錯誤處理訊息
+                    if (failures.length === 0 && dataUpdatedButPrintFailed.length === 0) {
+                        // 全部成功
                         showMessage(`成功列印 ${selectedArea.value}區所有 ${successes.length} 台機台的條碼`, 'alert-success');
-                    } else if (successes.length === 0) {
+                    } else if (successes.length === 0 && dataUpdatedButPrintFailed.length === 0) {
+                        // 全部失敗且資料庫也未更新
                         showMessage(`所有 ${failures.length} 台機台列印失敗`, 'alert-danger');
                     } else {
-                        showMessage(`部分列印成功: ${successes.length} 台成功，${failures.length} 台失敗`, 'alert-warning');
+                        // 混合結果
+                        let message = '';
+                        
+                        if (successes.length > 0) {
+                            message += `${successes.length} 台成功列印、`;
+                        }
+                        
+                        if (dataUpdatedButPrintFailed.length > 0) {
+                            message += `${dataUpdatedButPrintFailed.length} 台資料已更新但列印失敗、`;
+                        }
+                        
+                        if (failures.length > 0) {
+                            message += `${failures.length} 台完全失敗、`;
+                        }
+                        
+                        // 移除最後的逗號
+                        message = message.replace(/、$/, '');
+                        
+                        showMessage(`部分列印結果: ${message}`, 'alert-warning');
+                    }
+                    
+                    // 處理Python錯誤訊息
+                    if (dataUpdatedButPrintFailed.length > 0) {
+                        const pyErrors = dataUpdatedButPrintFailed.map(item => 
+                            `機台 ${item.car}: ${item.error}`
+                        ).join('\n\n');
+                        
+                        console.error('列印錯誤 (資料已更新):', pyErrors);
+                        
+                        // 顯示Python錯誤訊息
+                        pythonErrors.value = pyErrors;
+                        
+                        // 將Python錯誤訊息添加到調試區域
+                        debugApiResponse.value += '\n\n--- Python列印錯誤 ---\n' + pyErrors;
                     }
                     
                     // 在除錯區域顯示詳細信息
@@ -693,7 +773,8 @@
                         area: selectedArea.value,
                         total: areaMachines.length,
                         successes,
-                        failures
+                        dataUpdatedButPrintFailed: dataUpdatedButPrintFailed.map(f => f.car),
+                        failures: failures.map(f => f.car)
                     }, null, 2);
                 };
 
@@ -733,7 +814,14 @@
                         if (response.data.success) {
                             showMessage('重印成功', 'alert-success');
                         } else {
-                            showMessage(response.data.error, 'alert-danger');
+                            // 檢查是否資料庫已更新但列印失敗
+                            if (response.data.dataUpdated) {
+                                showMessage('資料已更新但列印失敗: ' + response.data.error, 'alert-warning');
+                                // 顯示Python錯誤訊息
+                                pythonErrors.value = response.data.error || '未知列印錯誤';
+                            } else {
+                                showMessage(response.data.error, 'alert-danger');
+                            }
                         }
                         
                     } catch (err) {
@@ -936,7 +1024,8 @@
                     setAreaOperator,
                     selectedAreaMachineCount,
                     canPrintSelectedArea,
-                    printAreaBarcodes
+                    printAreaBarcodes,
+                    pythonErrors
                 };
             }
         });
