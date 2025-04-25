@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重量管理系統</title>
+    <link href="css/styles.css" rel="stylesheet">
+    <!-- <script src="https://unpkg.com/html5-qrcode"></script> -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            font-size: 16px;
+            touch-action: manipulation; /* 優化觸控體驗 */
+        }
+        .fullscreen-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            font-size: 18px;
+            padding: 5px 10px;
+        }
+        .inspector-selection {
+            margin-bottom: 25px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .inspector-button {
+            font-size: 24px;
+            margin: 10px;
+            padding: 20px 30px;
+            border-radius: 10px;
+            width: 100%;
+            text-align: center;
+        }
+        .barcode-section {
+            margin-bottom: 20px;
+        }
+        #barcode {
+            font-size: 20px;
+            padding: 10px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .product-info {
+            margin-bottom: 25px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .product-info table {
+            width: 100%;
+        }
+        .product-info th {
+            width: 120px;
+            text-align: right;
+            padding-right: 15px;
+        }
+        .weight-controls {
+            margin-bottom: 25px;
+        }
+        .weight-display {
+            font-size: 36px;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #e9ecef;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .quantity-display {
+            font-size: 36px;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #e9ecef;
+            text-align: center;
+            border-radius: 5px;
+            color: #0d6efd;
+        }
+        .weight-input {
+            margin-top: 15px;
+        }
+        .unit-weight-input {
+            margin-top: 15px;
+            margin-bottom: 20px;
+        }
+        .action-buttons button {
+            font-size: 24px;
+            padding: 20px 30px;
+            margin: 10px;
+            width: 45%;
+            border-radius: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        /* 觸控友好的按鈕尺寸 */
+        button {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        input[type="text"],
+        input[type="number"] {
+            min-height: 44px;
+        }
+        /* 漂亮的標題樣式 */
+        .section-title {
+            color: #0d6efd;
+            border-left: 4px solid #0d6efd;
+            padding-left: 10px;
+            margin-bottom: 15px;
+        }
+        /* 添加按鈕點擊效果 */
+        .btn-touch {
+            transition: transform 0.1s;
+        }
+        .btn-touch:active {
+            transform: scale(0.97);
+        }
+        /* 詳細資訊區域樣式 */
+        .details-toggle {
+            cursor: pointer;
+            color: #0d6efd;
+            text-decoration: underline;
+            margin-top: 10px;
+            display: block;
+        }
+        .additional-info {
+            background-color: #f1f8ff;
+            border: 1px solid #cce5ff;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 15px;
+        }
+        /* 前箱單重提示樣式 */
+        .prev-box-info {
+            margin-top: 10px;
+            background-color: #e8f4f8;
+            border: 1px solid #b8d0e0;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 14px;
+        }
+        /* 數量輸入框樣式 */
+        .quantity-input {
+            font-size: 36px;
+            width: 100%;
+            text-align: center;
+            color: #0d6efd;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        .quantity-input:focus {
+            border-color: #0d6efd;
+            outline: none;
+        }
+        /* QR Code 掃描器樣式 */
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            margin-bottom: 20px;
+            border: 2px solid #cce5ff;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            display: none;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .scanner-toggle {
+            margin-bottom: 10px;
+            margin-top: 10px;
+            display: block;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container-fluid">
+        <!-- 全螢幕按鈕 -->
+        <button @click="toggleFullScreen" class="btn btn-outline-secondary fullscreen-btn btn-touch">
+            <i class="bi" :class="isFullScreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'"></i>
+            {{ isFullScreen ? '退出全螢幕' : '全螢幕模式' }}
+        </button>
+
+        <!-- 檢驗人選擇區域 -->
+        <div class="inspector-selection" v-if="!inspectorSelected">
+            <h2 class="section-title">請選擇磅重人員</h2>
+            <div class="row">
+                <div class="col-md-4" v-for="inspector in inspectors" :key="inspector.id">
+                    <button 
+                        class="btn btn-primary inspector-button btn-touch" 
+                        @click="selectInspector(inspector.id)">
+                        {{ inspector.name }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 條碼輸入區域 -->
+        <div class="barcode-section" v-if="inspectorSelected && !productInfo">
+            <h2 class="section-title">請掃描或輸入條碼</h2>
+            <div class="input-group">
+                <input type="text" id="barcode" v-model="barcode" class="form-control" placeholder="條碼編號" @keyup.enter="fetchProductInfo">
+                <button class="btn btn-primary btn-touch" @click="fetchProductInfo">查詢</button>
+            </div>
+            
+            <!-- 條碼掃描區域 - 直接顯示，不需要控制按鈕 -->
+            <div id="reader"></div>
+            <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; display: none;"></div>
+        </div>
+
+        <!-- 產品資訊顯示區域 -->
+        <div class="product-info" v-if="productInfo">
+            <h2 class="section-title">產品資訊</h2>
+            <table class="table">
+                <tr>
+                    <th>條碼編號:</th>
+                    <td>{{ barcode }}</td>
+                </tr>
+                <tr>
+                    <th>工單號:</th>
+                    <td>{{ productInfo.工單號 }}</td>
+                </tr>
+                <tr>
+                    <th>品名:</th>
+                    <td>{{ productInfo.品名 }}</td>
+                </tr>
+                <tr>
+                    <th>料號:</th>
+                    <td>{{ productInfo.料號 || '無資料' }}</td>
+                </tr>
+                <tr>
+                    <th>機台:</th>
+                    <td>{{ productInfo.機台 }}</td>
+                </tr>
+                <tr>
+                    <th>箱數:</th>
+                    <td>{{ productInfo.箱數 }}</td>
+                </tr>
+                <tr>
+                    <th>磅重人:</th>
+                    <td>{{ selectedInspectorName }}</td>
+                </tr>
+            </table>
+            
+            <!-- 詳細資訊顯示開關 -->
+            <div class="text-center">
+                <span @click="toggleAdditionalInfo" class="details-toggle">
+                    {{ showAdditionalInfo ? '隱藏詳細資訊' : '顯示詳細資訊' }}
+                </span>
+            </div>
+            
+            <!-- 額外詳細資訊區域 -->
+            <div v-if="showAdditionalInfo" class="additional-info">
+                <table class="table table-sm">
+                    <tr v-if="productInfo.交期">
+                        <th>交期:</th>
+                        <td>{{ productInfo.交期 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.工單數">
+                        <th>工單數:</th>
+                        <td>{{ productInfo.工單數 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.實際入庫">
+                        <th>實際入庫:</th>
+                        <td>{{ productInfo.實際入庫 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.產速">
+                        <th>產速:</th>
+                        <td>{{ productInfo.產速 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.台數">
+                        <th>台數:</th>
+                        <td>{{ productInfo.台數 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.日產量">
+                        <th>日產量:</th>
+                        <td>{{ productInfo.日產量 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.架機說明">
+                        <th>架機說明:</th>
+                        <td>{{ productInfo.架機說明 }}</td>
+                    </tr>
+                    <tr v-if="productInfo.架機日期">
+                        <th>架機日期:</th>
+                        <td>{{ productInfo.架機日期 }}</td>
+                    </tr>
+                    <tr v-if="productInfo['機台(預)']">
+                        <th>機台(預):</th>
+                        <td>{{ productInfo['機台(預)'] }}</td>
+                    </tr>
+                    <tr v-if="productInfo.利潤中心">
+                        <th>利潤中心:</th>
+                        <td>{{ productInfo.利潤中心 }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- 修改重量資訊部分 -->
+        <div class="weight-controls" v-if="productInfo">
+            <h2 class="section-title">重量資訊</h2>
+            
+            <div class="weight-display">
+                {{ displayWeight }} kg
+            </div>
+            
+            <div class="d-grid gap-2">
+                <button @click="getWeight" class="btn btn-success btn-lg btn-touch">
+                    <i class="bi bi-arrow-repeat"></i> 獲取重量
+                </button>
+            </div>
+            
+            <div class="weight-input">
+                <label for="weight" class="form-label">手動調整重量 (kg)</label>
+                <input type="number" id="weight" v-model="weight" class="form-control" step="0.001" min="0" @input="calculateQuantity">
+            </div>
+            
+            <div class="unit-weight-input">
+                <label for="unitWeight" class="form-label">單重 (kg / 個)</label>
+                <div class="input-group">
+                    <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0" @input="calculateQuantity">
+                    <button class="btn btn-outline-secondary" @click="usePreviousUnitWeight" v-if="hasPreviousUnitWeight" title="使用前一筆單重">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </div>
+                <small v-if="hasPreviousUnitWeight" class="text-muted">
+                    歷史單重: {{ previousUnitWeight }}
+                </small>
+            </div>
+            
+            <h2 class="section-title mt-4">計算結果</h2>
+            <!-- 修改這裡：從只讀顯示變為可編輯的輸入框 -->
+            <div class="quantity-input-container">
+                <label for="editedQuantity" class="form-label">數量 (個) <small class="text-muted">可手動調整</small></label>
+                <input type="number" id="editedQuantity" v-model="editedQuantity" class="quantity-input" min="1" step="1">
+            </div>
+            <small class="text-muted">系統計算數量: {{ calculatedQuantity }} 個</small>
+        </div>
+
+        <!-- 按鈕區域 -->
+        <div class="action-buttons" v-if="productInfo">
+            <div class="d-flex justify-content-between">
+                <button @click="submitData('合格')" class="btn btn-success btn-lg btn-touch" :disabled="!canSubmit">
+                    <i class="bi bi-check-circle"></i> OK
+                </button>
+                <button @click="submitData('異常')" class="btn btn-danger btn-lg btn-touch" :disabled="!canSubmit">
+                    <i class="bi bi-exclamation-triangle"></i> NG
+                </button>
+            </div>
+            <!-- <div class="d-grid gap-2 mt-3">
+                <button @click="resetForm" class="btn btn-secondary btn-touch">
+                    <i class="bi bi-arrow-clockwise"></i> 重置
+                </button>
+            </div> -->
+        </div>
+
+        <!-- 訊息顯示區域 -->
+        <div class="alert" :class="messageType" v-if="message" role="alert">
+            {{ message }}
+        </div>
+    </div>
+
+    <script src="js/vue.min.js"></script>
+    <script src="js/scripts.js"></script>
+    <script src="js/axios.min.js"></script>
+    <script>
+const { createApp, ref, computed, onMounted, watch } = Vue;
+        
+        createApp({
+            setup() {
+                // 磅重人員清單
+                const inspectors = ref([
+                    { id: '鄭惠娟', name: '鄭惠娟' }
+                ]);
+                
+                // 狀態變數
+                const selectedInspectorId = ref('');
+                const inspectorSelected = ref(false);
+                const barcode = ref('');
+                const productInfo = ref(null);
+                const weight = ref(0);
+                const unitWeight = ref(0);
+                const previousUnitWeight = ref(null);
+                const message = ref('');
+                const messageType = ref('');
+                const isFullScreen = ref(false);
+                const showAdditionalInfo = ref(false);
+                const scannerActive = ref(false);
+                let html5QrCode = null;
+                
+                // 新增可編輯的數量變數
+                const editedQuantity = ref(0);
+                const quantityManuallyEdited = ref(false);
+                
+                // 計算屬性
+                const selectedInspectorName = computed(() => {
+                    const inspector = inspectors.value.find(i => i.id === selectedInspectorId.value);
+                    return inspector ? inspector.name : '';
+                });
+                
+                const displayWeight = computed(() => parseFloat(weight.value).toFixed(3));
+                
+                const calculatedQuantity = computed(() => {
+                    if (parseFloat(unitWeight.value) > 0 && parseFloat(weight.value) > 0) {
+                        return Math.round(parseFloat(weight.value) * parseFloat(unitWeight.value));
+                    }
+                    return 0;
+                });
+                
+                // 監聽計算數量的變化，如果未手動編輯過，則自動更新編輯數量
+                watch(calculatedQuantity, (newVal) => {
+                    if (!quantityManuallyEdited.value && newVal > 0) {
+                        editedQuantity.value = newVal;
+                    }
+                });
+                
+                // 監聽編輯數量的變化，標記為已手動編輯
+                watch(editedQuantity, () => {
+                    quantityManuallyEdited.value = true;
+                });
+                
+                const hasPreviousUnitWeight = computed(() => 
+                    previousUnitWeight.value && parseFloat(previousUnitWeight.value) > 0
+                );
+                
+                const canSubmit = computed(() => 
+                    selectedInspectorId.value && 
+                    barcode.value && 
+                    productInfo.value && 
+                    parseFloat(weight.value) > 0 && 
+                    parseFloat(unitWeight.value) > 0 &&
+                    parseInt(editedQuantity.value) > 0
+                );
+                
+                // 選擇檢驗人員
+                const selectInspector = (inspectorId) => {
+                    selectedInspectorId.value = inspectorId;
+                    inspectorSelected.value = true;
+                    // 選擇人員後直接打開掃描器
+                    setTimeout(() => {
+                        startScanner();
+                    }, 500); // 稍微延遲以確保 DOM 已更新
+                };
+                
+                // 使用前一筆單重
+                const usePreviousUnitWeight = () => {
+                    if (previousUnitWeight.value) {
+                        unitWeight.value = previousUnitWeight.value;
+                        calculateQuantity();
+                    }
+                };
+                
+                // 切換額外資訊顯示
+                const toggleAdditionalInfo = () => {
+                    showAdditionalInfo.value = !showAdditionalInfo.value;
+                };
+                
+                // 獲取產品資訊
+                const fetchProductInfo = async () => {
+                    if (!barcode.value) {
+                        showMessage('請輸入條碼編號', 'alert-warning');
+                        return;
+                    }
+                    
+                    try {
+                        const response = await axios.get(`backend/weight.php?action=getProductInfo&barcode=${barcode.value}`);
+                        
+                        if (response.data.success) {
+                            productInfo.value = response.data.data;
+                            
+                            // 如果有現有的重量資料，則填入
+                            if (productInfo.value.重量 && parseFloat(productInfo.value.重量) > 0) {
+                                weight.value = parseFloat(productInfo.value.重量);
+                            }
+                            
+                            // 如果有現有的單重資料，則填入
+                            if (productInfo.value.單重 && parseFloat(productInfo.value.單重) > 0) {
+                                unitWeight.value = parseFloat(productInfo.value.單重);
+                            }
+                            // 如果有前一筆單重資料，保存起來
+                            else if (productInfo.value.前一筆單重) {
+                                previousUnitWeight.value = parseFloat(productInfo.value.前一筆單重).toFixed(5);
+                                // 自動填入前一筆單重
+                                unitWeight.value = previousUnitWeight.value;
+                            }
+                            
+                            // 如果有現有的數量資料，則填入編輯數量
+                            if (productInfo.value.數量 && parseInt(productInfo.value.數量) > 0) {
+                                editedQuantity.value = parseInt(productInfo.value.數量);
+                                quantityManuallyEdited.value = true;
+                            }
+                            
+                            calculateQuantity();
+                            showMessage('成功獲取產品資訊', 'alert-success');
+                            
+                            // 取得產品資訊後關閉掃描器
+                            stopScanner();
+                        } else {
+                            showMessage(response.data.message || '查無此條碼', 'alert-danger');
+                        }
+                    } catch (error) {
+                        console.error('獲取產品資訊錯誤:', error);
+                        showMessage('系統錯誤，請稍後再試', 'alert-danger');
+                    }
+                };
+                
+                // 獲取重量
+                const getWeight = async () => {
+                    try {
+                        const response = await axios.get('backend/weight.php?action=getWeight');
+                        
+                        if (response.data.success) {
+                            weight.value = response.data.weight;
+                            calculateQuantity();
+                            showMessage('成功獲取重量', 'alert-success');
+                        } else {
+                            showMessage(response.data.message || '無法獲取重量', 'alert-warning');
+                        }
+                    } catch (error) {
+                        console.error('獲取重量錯誤:', error);
+                        showMessage('獲取重量失敗，請手動輸入', 'alert-warning');
+                    }
+                };
+                
+                // 計算數量
+                const calculateQuantity = () => {
+                    // 如果數量未被手動編輯過，則更新編輯數量為計算結果
+                    if (!quantityManuallyEdited.value && calculatedQuantity.value > 0) {
+                        editedQuantity.value = calculatedQuantity.value;
+                    }
+                };
+                
+                // 提交資料
+                const submitData = async (status) => {
+                    if (!canSubmit.value) {
+                        showMessage('請填寫所有必要資訊', 'alert-warning');
+                        return;
+                    }
+                    
+                    try {
+                        const data = {
+                            barcode: barcode.value,
+                            inspector: selectedInspectorId.value,
+                            weight: weight.value,
+                            unitWeight: unitWeight.value,
+                            quantity: parseInt(editedQuantity.value), // 使用編輯後的數量
+                            status: status
+                        };
+                        
+                        const response = await axios.post('backend/weight.php?action=saveData', data);
+                        
+                        if (response.data.success) {
+                            showMessage(`資料儲存成功 - ${status}`, 'alert-success');
+                            setTimeout(() => {
+                                resetForm();
+                            }, 2000);
+                        } else {
+                            showMessage(response.data.message || '儲存失敗', 'alert-danger');
+                        }
+                    } catch (error) {
+                        console.error('儲存資料錯誤:', error);
+                        showMessage('系統錯誤，請稍後再試', 'alert-danger');
+                    }
+                };
+                
+                // 重置表單
+                const resetForm = () => {
+                    barcode.value = '';
+                    productInfo.value = null;
+                    weight.value = 0;
+                    unitWeight.value = 0;
+                    previousUnitWeight.value = null;
+                    showAdditionalInfo.value = false;
+                    editedQuantity.value = 0;
+                    quantityManuallyEdited.value = false;
+                    // 保留檢驗人員選擇
+                };
+                
+                // 全螢幕切換
+                const toggleFullScreen = () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(e => {
+                            showMessage('無法進入全螢幕模式', 'alert-warning');
+                        });
+                        isFullScreen.value = true;
+                    } else {
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                            isFullScreen.value = false;
+                        }
+                    }
+                };
+                
+                // 掃描器相關函數
+                const toggleScanner = () => {
+                    if (scannerActive.value) {
+                        stopScanner();
+                    } else {
+                        startScanner();
+                    }
+                };
+                
+                const startScanner = () => {
+                    if (!html5QrCode) {
+                        html5QrCode = new Html5Qrcode("reader");
+                    }
+                    
+                    html5QrCode.start(
+                        { facingMode: "environment" }, 
+                        { fps: 10, qrbox: 250 }, 
+                        (qrCodeMessage) => {
+                            // 成功掃描條碼
+                            const resultElement = document.getElementById('result');
+                            resultElement.textContent = `掃描結果: ${qrCodeMessage}`;
+                            resultElement.style.display = 'block';
+                            
+                            // 將掃描結果填入條碼輸入框
+                            barcode.value = qrCodeMessage;
+                            
+                            // 自動觸發查詢
+                            fetchProductInfo();
+                        },
+                        (errorMessage) => {
+                            // 處理掃描錯誤
+                            console.warn(`條碼掃描錯誤: ${errorMessage}`);
+                        }
+                    ).catch(err => {
+                        console.error(`無法啟動掃描器: ${err}`);
+                        
+                        // 顯示相機權限錯誤並提供重試選項
+                        if (err.toString().includes('NotAllowedError') || 
+                            err.toString().includes('permission') || 
+                            err.toString().includes('Permission')) {
+                            showMessage('請允許相機權限以使用掃描功能', 'alert-warning');
+                            
+                            // 創建一個重試按鈕
+                            const readerDiv = document.getElementById('reader');
+                            if (readerDiv) {
+                                // 清除現有內容
+                                readerDiv.innerHTML = '';
+                                
+                                // 創建重試區域
+                                const retryDiv = document.createElement('div');
+                                retryDiv.className = 'text-center p-4';
+                                retryDiv.innerHTML = `
+                                    <p class="mb-3">無法啟動相機，請確認已授予相機權限</p>
+                                    <button class="btn btn-primary btn-lg btn-touch">
+                                        重新開啟相機
+                                    </button>
+                                `;
+                                
+                                // 添加重試按鈕事件
+                                readerDiv.appendChild(retryDiv);
+                                const retryButton = retryDiv.querySelector('button');
+                                if (retryButton) {
+                                    retryButton.addEventListener('click', () => {
+                                        // 嘗試重新啟動掃描器
+                                        readerDiv.innerHTML = '';  // 清空內容
+                                        startScanner();  // 重新啟動
+                                    });
+                                }
+                            }
+                        } else {
+                            showMessage('無法啟動掃描器，請檢查相機設備', 'alert-warning');
+                        }
+                        
+                        scannerActive.value = false;
+                    });
+                    
+                    scannerActive.value = true;
+                };
+                
+                const stopScanner = () => {
+                    if (html5QrCode && html5QrCode.isScanning) {
+                        html5QrCode.stop().then(() => {
+                            console.log('掃描器已停止');
+                            scannerActive.value = false;
+                        }).catch(err => {
+                            console.error(`停止掃描器錯誤: ${err}`);
+                        });
+                    }
+                };
+                
+                // 顯示訊息
+                const showMessage = (msg, type) => {
+                    message.value = msg;
+                    messageType.value = type;
+                    
+                    // 3秒後自動清除訊息
+                    setTimeout(() => {
+                        message.value = '';
+                        messageType.value = '';
+                    }, 3000);
+                };
+                
+                // 生命週期鉤子
+                onMounted(() => {
+                    // 頁面載入後自動聚焦到條碼輸入框
+                    document.addEventListener('keydown', (e) => {
+                        // 如果用戶在輸入框外按下數字或字母，自動聚焦到條碼輸入框
+                        const tag = document.activeElement.tagName.toLowerCase();
+                        if (tag !== 'input' && tag !== 'textarea' && e.key.length === 1) {
+                            const barcodeInput = document.getElementById('barcode');
+                            if (barcodeInput) {
+                                barcodeInput.focus();
+                            }
+                        }
+                    });
+                });
+                
+                return {
+                    inspectors,
+                    selectedInspectorId,
+                    selectedInspectorName,
+                    inspectorSelected,
+                    barcode,
+                    productInfo,
+                    weight,
+                    unitWeight,
+                    previousUnitWeight,
+                    hasPreviousUnitWeight,
+                    message,
+                    messageType,
+                    isFullScreen,
+                    displayWeight,
+                    calculatedQuantity,
+                    editedQuantity,
+                    canSubmit,
+                    showAdditionalInfo,
+                    scannerActive,
+                    selectInspector,
+                    fetchProductInfo,
+                    getWeight,
+                    calculateQuantity,
+                    submitData,
+                    resetForm,
+                    toggleFullScreen,
+                    toggleAdditionalInfo,
+                    usePreviousUnitWeight,
+                    toggleScanner
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
