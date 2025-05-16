@@ -97,7 +97,7 @@ def print_zebra_label(data, barcode_id):
         barcode_height = 100
 
         # 條碼模組寬度(1-10)，數字越大條碼越寬，超過5可能會過版
-        module_width = 5
+        module_width = 3
         
         # 準備ZPL命令 - 使用英文標籤避免編碼問題
         zpl_command = "^XA"  # 開始ZPL命令
@@ -114,8 +114,8 @@ def print_zebra_label(data, barcode_id):
         # 設定 Code 128 條碼參數
         zpl_command += f"^BCN,{barcode_height},Y,N,N"
         
-        # 構建條碼，格式為工單號+機台+箱數
-        barcode_value = data['工單號'] + data['機台'] + data['箱數']
+        # 使用完整的條碼編號
+        barcode_value = data['條碼編號']  # 使用完整的條碼ID
         zpl_command += f"^FD{barcode_value}^FS"
         
         # 日期
@@ -150,10 +150,10 @@ def print_zebra_label(data, barcode_id):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD顧車:{data['顧車']}^FS"
 
-        # 工序 - 保持原來的位置
+        # 班別
         zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 100}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD工序:10^FS"
+        zpl_command += f"^FD班別:{data['班別']}^FS"
 
         # 機台 - 保持原來的位置
         zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 200}"
@@ -165,10 +165,11 @@ def print_zebra_label(data, barcode_id):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD箱數:{data['箱數']}^FS"
 
-        # 班別 - 固定位置在y軸500
+        # 工序
         zpl_command += f"^FO{350},{y_position + barcode_height + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD班別:{data['班別']}^FS"
+        zpl_command += f"^FD工序:10^FS"
+
 
         zpl_command += "^XZ"  # 結束ZPL命令
         
@@ -235,7 +236,8 @@ def main():
                 '品名': product_name,
                 '顧車': operator,
                 '箱數': box_number,
-                '班別': shift
+                '班別': shift,
+                '條碼編號': barcode_id  # 新增完整條碼ID
             }
             
             # 列印標籤

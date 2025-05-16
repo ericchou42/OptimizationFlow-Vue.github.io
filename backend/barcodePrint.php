@@ -495,80 +495,42 @@ function reprintBarcode() {
         $shiftNumber = $data['shiftNumber'] ?? '1';
         $nextUnit = $data['nextUnit'] ?? '電';
         
-        // 構建條碼編號
+        // ===== 關鍵修改: 總是使用新的格式建立條碼編號 =====
         $barcodeId = $date . $workOrder . $car . $shiftNumber . $boxNumber;
         
-        // 檢查是否有相同日期、工單號、機台、箱數、班別的記錄
-        $checkNewSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 工單號 = ? AND 機台 = ? AND 箱數 = ? AND 班別 = ? AND 條碼編號 LIKE ?";
-        $checkNewStmt = $pdo->prepare($checkNewSql);
-        $datePrefix = $date . '%';
-        $checkNewStmt->execute([$workOrder, $car, $boxNumber, $shift, $datePrefix]);
+        // 添加詳細日誌
+        error_log("重印條碼, ID: {$barcodeId}, 工單: {$workOrder}, 機台: {$car}, 箱號: {$boxNumber}");
         
-        // 如果新格式條碼不存在，檢查舊格式
-        if ($checkNewStmt->rowCount() == 0) {
-            // 檢查舊格式條碼
-            $oldBarcodeId = $workOrder . $car . $boxNumber;
-            $checkOldSql = "SELECT * FROM 生產紀錄表 WHERE 條碼編號 = ?";
-            $checkOldStmt = $pdo->prepare($checkOldSql);
-            $checkOldStmt->execute([$oldBarcodeId]);
+        // 檢查記錄是否存在，若不存在則創建
+        $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 條碼編號 = ?";
+        $checkStmt = $pdo->prepare($checkSql);
+        $checkStmt->execute([$barcodeId]);
+        
+        if ($checkStmt->rowCount() == 0) {
+            // 記錄不存在，創建新記錄
+            $columnExists = false;
+            try {
+                $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
+                $columnExists = ($columnCheck->rowCount() > 0);
+            } catch (PDOException $e) {
+                error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
+            }
             
-            if ($checkOldStmt->rowCount() == 0) {
-                // 兩種格式都不存在，嘗試創建新記錄
-                $columnExists = false;
-                try {
-                    $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
-                    $columnExists = ($columnCheck->rowCount() > 0);
-                } catch (PDOException $e) {
-                    error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
-                }
-                
-                if ($columnExists) {
-                    $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別, 後續單位) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-                    $insertStmt = $pdo->prepare($insertSql);
-                    $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift, $nextUnit]);
-                } else {
-                    $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?)";
-                    $insertStmt = $pdo->prepare($insertSql);
-                    $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
-                }
-                
-                // 使用新創建的條碼編號
-                $existingBarcode = $barcodeId;
+            if ($columnExists) {
+                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別, 後續單位) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                $insertStmt = $pdo->prepare($insertSql);
+                $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift, $nextUnit]);
             } else {
-                // 使用舊格式條碼
-                $existingRecord = $checkOldStmt->fetch(PDO::FETCH_ASSOC);
-                $existingBarcode = $existingRecord['條碼編號'];
-                
-                // 更新舊記錄
-                $columnExists = false;
-                try {
-                    $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
-                    $columnExists = ($columnCheck->rowCount() > 0);
-                } catch (PDOException $e) {
-                    error_log('檢查後續單位欄位錯誤: ' . $e->getMessage());
-                }
-                
-                if ($columnExists) {
-                    $updateSql = "UPDATE 生產紀錄表 
-                                SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
-                                WHERE 條碼編號 = ?";
-                    $updateStmt = $pdo->prepare($updateSql);
-                    $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $existingBarcode]);
-                } else {
-                    $updateSql = "UPDATE 生產紀錄表 
-                                SET 品名 = ?, 顧車 = ?, 班別 = ? 
-                                WHERE 條碼編號 = ?";
-                    $updateStmt = $pdo->prepare($updateSql);
-                    $updateStmt->execute([$productName, $operator, $shift, $existingBarcode]);
-                }
+                $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?)";
+                $insertStmt = $pdo->prepare($insertSql);
+                $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift]);
             }
         } else {
-            // 使用找到的記錄
-            $existingBarcode = $checkNewStmt->fetchColumn();
+            // 更新現有記錄
+            $existingBarcode = $checkStmt->fetchColumn();
             
-            // 更新記錄信息
             $columnExists = false;
             try {
                 $columnCheck = $pdo->query("SHOW COLUMNS FROM 生產紀錄表 LIKE '後續單位'");
@@ -582,19 +544,19 @@ function reprintBarcode() {
                             SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? 
                             WHERE 條碼編號 = ?";
                 $updateStmt = $pdo->prepare($updateSql);
-                $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $existingBarcode]);
+                $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
             } else {
                 $updateSql = "UPDATE 生產紀錄表 
                             SET 品名 = ?, 顧車 = ?, 班別 = ? 
                             WHERE 條碼編號 = ?";
                 $updateStmt = $pdo->prepare($updateSql);
-                $updateStmt->execute([$productName, $operator, $shift, $existingBarcode]);
+                $updateStmt->execute([$productName, $operator, $shift, $barcodeId]);
             }
         }
         
-        // 無論如何，使用找到或創建的條碼ID列印
+        // ===== 關鍵修改: 使用與批次列印相同的命令格式 =====
         $command = '"' . PYTHON_PATH . '" "' . BARCODE_SCRIPT_PATH . '" ' . 
-                  escapeshellarg($existingBarcode) . " " . 
+                  escapeshellarg($barcodeId) . " " . 
                   escapeshellarg($workOrder) . " " . 
                   escapeshellarg($productName) . " " . 
                   escapeshellarg($operator) . " " . 
@@ -605,13 +567,46 @@ function reprintBarcode() {
         // 記錄執行的命令以便調試
         error_log('Executing reprint command: ' . $command);
         
-        exec($command, $output, $returnVar);
-                
-        if ($returnVar !== 0) {
-            error_log('Reprint error: ' . implode("\n", $output));
+        // 使用proc_open來獲取更詳細的輸出
+        $descriptors = [
+            0 => ["pipe", "r"],  // stdin
+            1 => ["pipe", "w"],  // stdout
+            2 => ["pipe", "w"]   // stderr
+        ];
+        
+        $process = proc_open($command, $descriptors, $pipes);
+        if (is_resource($process)) {
+            // 關閉標準輸入
+            fclose($pipes[0]);
+            
+            // 讀取標準輸出
+            $stdout = stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            
+            // 讀取標準錯誤
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[2]);
+            
+            // 獲取退出狀態
+            $returnVar = proc_close($process);
+            
+            // 記錄更詳細的輸出
+            error_log("Command result - stdout: {$stdout}, stderr: {$stderr}, returnVar: {$returnVar}");
+            
+            if ($returnVar !== 0) {
+                error_log('Reprint error: ' . $stderr);
+                echo json_encode([
+                    'success' => false, 
+                    'error' => '重印失敗: ' . $stderr,
+                    'dataUpdated' => true
+                ]);
+                return;
+            }
+        } else {
+            error_log('無法啟動進程');
             echo json_encode([
                 'success' => false, 
-                'error' => '重印失敗: ' . implode("\n", $output),
+                'error' => '無法啟動印表機進程',
                 'dataUpdated' => true
             ]);
             return;
