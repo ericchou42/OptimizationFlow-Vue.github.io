@@ -382,7 +382,7 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                 
                 const calculatedQuantity = computed(() => {
                     if (parseFloat(unitWeight.value) > 0 && parseFloat(weight.value) > 0) {
-                        return Math.round(parseFloat(weight.value) * parseFloat(unitWeight.value));
+                        return Math.floor(parseFloat(weight.value) * parseFloat(unitWeight.value));
                     }
                     return 0;
                 });
