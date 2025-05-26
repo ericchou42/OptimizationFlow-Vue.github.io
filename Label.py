@@ -50,6 +50,24 @@ def get_work_order_data(connection, work_order_number):
         print(f"查詢錯誤: {e}")
         return None
 
+# 新增文字換行函數
+def wrap_text(text, max_length):
+    """將文字按最大長度分割為多行"""
+    if len(text) <= max_length:
+        return [text]
+    
+    lines = []
+    while len(text) > 0:
+        if len(text) <= max_length:
+            lines.append(text)
+            break
+        
+        # 對於中文等無空格的文字，直接在最大長度處截斷
+        lines.append(text[:max_length])
+        text = text[max_length:]
+    
+    return lines
+
 def print_zebra_label(data):
     try:
         logging.info(f"開始打印標籤，資料: {data}")
@@ -103,10 +121,32 @@ def print_zebra_label(data):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FDMM4^FS"
 
-        # 入庫日期
+        # HSF
+        zpl_command += f"^FO{30},{y_position + 530}"
+        zpl_command += "^A@N,30,30,E:ARIAL.TTF"
+        zpl_command += f"^FD[HSF]^FS"
+
+        # 日期
         zpl_command += f"^FO{x_position},{y_position}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD日期:{current_date}^FS"
+
+        # 品名自動換行處理 - 限制最多兩行(100和200位置)
+        full_text = f"品名:{data['品名']}"
+        max_length = 25  # 每行最大字符數，可以根據需要調整
+        wrapped_lines = wrap_text(full_text, max_length)
+        
+        # 如果超過兩行，只取前兩行
+        if len(wrapped_lines) > 2:
+            wrapped_lines = wrapped_lines[:2]
+        
+        # 打印每一行，100和200兩行位置
+        line_positions = [100, 200]
+        for i, line in enumerate(wrapped_lines):
+            if i < len(line_positions):  # 確保不超過預定的行數
+                zpl_command += f"^FO{x_position},{y_position + line_positions[i]}"
+                zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+                zpl_command += f"^FD{line}^FS"
 
         # 品名
         zpl_command += f"^FO{x_position},{y_position + 100}"
@@ -114,24 +154,39 @@ def print_zebra_label(data):
         zpl_command += f"^FD品名:{data['品名']}^FS"
 
         # 料號
-        zpl_command += f"^FO{x_position},{y_position + 200}"
+        zpl_command += f"^FO{x_position},{y_position + 300}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD料號:{data['料號']}^FS"
 
+        # 淨重
+        zpl_command += f"^FO{x_position_right},{y_position + 400}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD淨重:{data['重量']}^FS"
+
         # 數量
-        zpl_command += f"^FO{x_position},{y_position + 300}"
+        zpl_command += f"^FO{x_position},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD數量:{data['數量']}^FS"
+
+        # 班別
+        zpl_command += f"^FO{x_position_right},{y_position + 600}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD班別:{data['班別']}^FS"
 
         # 機台
         zpl_command += f"^FO{x_position},{y_position + 400}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD機台:{data['機台']}^FS"
 
-        # 檢驗人
-        zpl_command += f"^FO{x_position},{y_position + 500}"
+        # 後續單位
+        zpl_command += f"^FO{x_position_right},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD檢驗:{data['檢驗人']}^FS"
+        zpl_command += f"^FD後續單位:{data['後續單位']}^FS"
+
+        # 磅貨
+        zpl_command += f"^FO{x_position},{y_position + 600}"
+        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += f"^FD磅貨:{data['檢驗人']}^FS"
 
         # 異常品
         if '異常' in data and data['異常'] == 1:
@@ -140,27 +195,7 @@ def print_zebra_label(data):
             zpl_command += "^FR" # 反轉顏色
             # zpl_command += "^FB400,1,0,C" # 文字區塊，居中對齊
             zpl_command += f"^FD異常^FS"
-
-        # 淨重
-        zpl_command += f"^FO{x_position_right},{y_position + 300}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD淨重:{data['重量']}^FS"
-
-        # 後續單位
-        zpl_command += f"^FO{x_position_right},{y_position + 400}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD後續單位:{data['後續單位']}^FS"
-
-        # 班別
-        zpl_command += f"^FO{x_position_right},{y_position + 500}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD班別:{data['班別']}^FS"
-
-        # HSF
-        zpl_command += f"^FO{30},{y_position + 530}"
-        zpl_command += "^A@N,30,30,E:ARIAL.TTF"
-        zpl_command += f"^FD[HSF]^FS"
-
+        
         # 結束ZPL命令
         zpl_command += "^XZ"  
         
