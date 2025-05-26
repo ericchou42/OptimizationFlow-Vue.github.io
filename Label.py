@@ -13,7 +13,7 @@ load_dotenv()
 
 # 設定日誌
 logging.basicConfig(
-    filename='label_log.txt',
+    filename='/tmp/label_log.txt',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     encoding='utf-8'  # 添加明確的編碼設定
