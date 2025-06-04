@@ -163,10 +163,10 @@ def print_zebra_label(data):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD淨重:{data['重量']}^FS"
 
-        # 數量
+        # 後續單位
         zpl_command += f"^FO{x_position},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD數量:{data['數量']}^FS"
+        zpl_command += f"^FD後續單位:{data['後續單位']}^FS"
 
         # 班別
         zpl_command += f"^FO{x_position_right},{y_position + 600}"
@@ -178,10 +178,10 @@ def print_zebra_label(data):
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD機台:{data['機台']}^FS"
 
-        # 後續單位
+        # 數量
         zpl_command += f"^FO{x_position_right},{y_position + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
-        zpl_command += f"^FD後續單位:{data['後續單位']}^FS"
+        zpl_command += f"^FD數量:{data['數量']}^FS"
 
         # 磅貨
         zpl_command += f"^FO{x_position},{y_position + 600}"
