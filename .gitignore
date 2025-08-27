@@ -4,3 +4,4 @@
 /backend/barcode_log.txt
 printer_log.txt
 weight_log.txt
+.env

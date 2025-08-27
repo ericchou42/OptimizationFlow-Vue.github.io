@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日生產彙總報表</title>
+    <link href="css/styles.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+        }
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+        .main-table th, .main-table td {
+            vertical-align: middle;
+            text-align: center;
+            white-space: nowrap;
+            padding: 0.5rem;
+        }
+        .unit-weight-input {
+            width: 120px;
+            margin: auto;
+        }
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .weight-group th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container-fluid">
+        <h1 class="text-center mb-4">每日生產彙總報表</h1>
+
+        <div class="header-controls">
+            <div class="date-picker-container">
+                <label for="report-date">選擇報表日期:</label>
+                <input type="date" id="report-date" class="form-control d-inline-block" style="width: auto;" v-model="selectedDate" @change="fetchReportData">
+            </div>
+            <button class="btn btn-success" @click="saveAllWeights" :disabled="!reportData.length">
+                <i class="bi bi-save"></i> 儲存全部單重
+            </button>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div v-if="loading" class="text-center p-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">載入中...</span>
+            </div>
+            <p class="mt-2">報表產生中...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div v-if="error" class="alert alert-danger">
+            {{ error }}
+        </div>
+
+        <!-- Main Content -->
+        <div v-if="!loading && !error" class="table-container">
+            <table class="table table-bordered table-striped main-table">
+                <thead class="table-light">
+                    <tr>
+                        <th rowspan="2">機台</th>
+                        <th rowspan="2">品名</th>
+                        <th colspan="4">日班淨重</th>
+                        <th colspan="4">夜班淨重</th>
+                        <th rowspan="2">單重</th>
+                        <th rowspan="2">日班數量</th>
+                        <th rowspan="2">夜班數量</th>
+                        <th rowspan="2">合計</th>
+                        <th rowspan="2">前日數量</th>
+                        <th rowspan="2">累計</th>
+                        <th rowspan="2">工單號碼</th>
+                        <th rowspan="2">NP碼</th>
+                    </tr>
+                    <tr class="weight-group">
+                        <th>第一箱</th><th>第二箱</th><th>第三箱</th><th>第四箱</th>
+                        <th>第一箱</th><th>第二箱</th><th>第三箱</th><th>第四箱</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="reportData.length === 0">
+                        <td colspan="18" class="text-center">該日期無生產資料</td>
+                    </tr>
+                    <tr v-for="row in reportData" :key="row.機台 + row.工單號碼">
+                        <td>{{ row.機台 }}</td>
+                        <td>{{ row.品名 }}</td>
+                        <td>{{ row.日班淨重1 }}</td>
+                        <td>{{ row.日班淨重2 }}</td>
+                        <td>{{ row.日班淨重3 }}</td>
+                        <td>{{ row.日班淨重4 }}</td>
+                        <td>{{ row.夜班淨重1 }}</td>
+                        <td>{{ row.夜班淨重2 }}</td>
+                        <td>{{ row.夜班淨重3 }}</td>
+                        <td>{{ row.夜班淨重4 }}</td>
+                        <td>
+                            <input type="number" class="form-control unit-weight-input" v-model="row.單重" step="0.00001" min="0">
+                        </td>
+                        <td>{{ row.日班數量 }}</td>
+                        <td>{{ row.夜班數量 }}</td>
+                        <td>{{ row.合計 }}</td>
+                        <td>{{ row.前日數量 }}</td>
+                        <td>{{ row.累計 }}</td>
+                        <td>{{ row.工單號碼 }}</td>
+                        <td>{{ row.NP碼 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Message Area -->
+        <div v-if="message" class="alert" :class="messageType" role="alert" style="position: fixed; bottom: 20px; right: 20px; z-index: 1050;">
+            {{ message }}
+        </div>
+
+        <!-- Debug Info -->
+        <div class="debug-container mt-5">
+            <button class="btn btn-outline-secondary" @click="showDebug = !showDebug">
+                {{ showDebug ? '隱藏' : '顯示' }}偵錯資訊
+            </button>
+            <div v-if="showDebug && debugInfo" class="debug-info p-3 mt-2 bg-light border rounded">
+                <h4>後端偵錯資訊</h4>
+                <pre>{{ JSON.stringify(debugInfo, null, 2) }}</pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/vue.min.js"></script>
+    <script src="js/axios.min.js"></script>
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const error = ref(null);
+                const reportData = ref([]);
+                const selectedDate = ref(new Date().toISOString().slice(0, 10));
+                const message = ref('');
+                const messageType = ref('');
+                const debugInfo = ref(null);
+                const showDebug = ref(false);
+
+                const fetchReportData = async () => {
+                    try {
+                        loading.value = true;
+                        error.value = null;
+                        debugInfo.value = null;
+                        const response = await axios.get(`backend/unit_weight.php?action=getDailyReportData&date=${selectedDate.value}`);
+                        if (response.data.success) {
+                            reportData.value = response.data.data;
+                            debugInfo.value = response.data.debug || null;
+                        } else {
+                            error.value = response.data.message;
+                            reportData.value = [];
+                        }
+                    } catch (err) {
+                        error.value = '無法載入報表資料，請稍後再試。';
+                        reportData.value = [];
+                        console.error(err);
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                const saveAllWeights = async () => {
+                    const weightsToSave = reportData.value.filter(row => row.單重 && parseFloat(row.單重) > 0);
+
+                    if (weightsToSave.length === 0) {
+                        showMessage('沒有需要儲存的單重資料。', 'alert-info');
+                        return;
+                    }
+
+                    try {
+                        const response = await axios.post('backend/unit_weight.php?action=saveUnitWeights', {
+                            date: selectedDate.value,
+                            weights: weightsToSave
+                        });
+
+                        if (response.data.success) {
+                            showMessage('單重已成功儲存！', 'alert-success');
+                            fetchReportData(); // Refresh data after saving
+                        } else {
+                            showMessage(response.data.message, 'alert-danger');
+                        }
+                    } catch (err) {
+                        showMessage('儲存失敗，請檢查網路連線或聯絡管理員。', 'alert-danger');
+                        console.error(err);
+                    }
+                };
+
+                const showMessage = (msg, type) => {
+                    message.value = msg;
+                    messageType.value = type;
+                    setTimeout(() => {
+                        message.value = '';
+                        messageType.value = '';
+                    }, 3000);
+                };
+
+                onMounted(() => {
+                    fetchReportData();
+                });
+
+                return {
+                    loading,
+                    error,
+                    reportData,
+                    selectedDate,
+                    message,
+                    messageType,
+                    debugInfo,
+                    showDebug,
+                    fetchReportData,
+                    saveAllWeights,
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
