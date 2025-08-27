@@ -242,6 +242,10 @@
                         <th>工單數:</th>
                         <td>{{ productInfo.工單數 }}</td>
                     </tr>
+                    <tr v-if="productInfo.累計數量">
+                        <th>目前累計數量:</th>
+                        <td>{{ productInfo.累計數量 }}</td>
+                    </tr>
                     <tr v-if="productInfo.實際入庫">
                         <th>實際入庫:</th>
                         <td>{{ productInfo.實際入庫 }}</td>
@@ -294,13 +298,13 @@
             
             <div class="weight-input">
                 <label for="weight" class="form-label">手動調整重量 (kg)</label>
-                <input type="number" id="weight" v-model="weight" class="form-control" step="0.001" min="0" @input="calculateQuantity">
+                <input type="number" id="weight" v-model="weight" class="form-control" step="0.001" min="0">
             </div>
             
             <div class="unit-weight-input">
-                <label for="unitWeight" class="form-label">單重 (kg / 個)</label>
+                <label for="unitWeight" class="form-label">單重 (個 / kg)</label>
                 <div class="input-group">
-                    <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0" @input="calculateQuantity">
+                    <input type="number" id="unitWeight" v-model="unitWeight" class="form-control" step="0.00001" min="0">
                     <button class="btn btn-outline-secondary" @click="usePreviousUnitWeight" v-if="hasPreviousUnitWeight" title="使用前一筆單重">
                         <i class="bi bi-arrow-counterclockwise"></i>
                     </button>
@@ -311,7 +315,6 @@
             </div>
             
             <h2 class="section-title mt-4">計算結果</h2>
-            <!-- 修改這裡：從只讀顯示變為可編輯的輸入框 -->
             <div class="quantity-input-container">
                 <label for="editedQuantity" class="form-label">數量 (個) <small class="text-muted">可手動調整</small></label>
                 <input type="number" id="editedQuantity" v-model="editedQuantity" class="quantity-input" min="1" step="1">
@@ -329,11 +332,6 @@
                     <i class="bi bi-exclamation-triangle"></i> NG
                 </button>
             </div>
-            <!-- <div class="d-grid gap-2 mt-3">
-                <button @click="resetForm" class="btn btn-secondary btn-touch">
-                    <i class="bi bi-arrow-clockwise"></i> 重置
-                </button>
-            </div> -->
         </div>
 
         <!-- 訊息顯示區域 -->
@@ -343,7 +341,6 @@
     </div>
 
     <script src="js/vue.min.js"></script>
-    <script src="js/scripts.js"></script>
     <script src="js/axios.min.js"></script>
     <script>
 const { createApp, ref, computed, onMounted, watch } = Vue;
@@ -367,8 +364,6 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                 const messageType = ref('');
                 const isFullScreen = ref(false);
                 const showAdditionalInfo = ref(false);
-                
-                // 新增可編輯的數量變數
                 const editedQuantity = ref(0);
                 const quantityManuallyEdited = ref(false);
                 
@@ -387,16 +382,16 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     return 0;
                 });
                 
-                // 監聽計算數量的變化，如果未手動編輯過，則自動更新編輯數量
                 watch(calculatedQuantity, (newVal) => {
-                    if (!quantityManuallyEdited.value && newVal > 0) {
+                    if (!quantityManuallyEdited.value) {
                         editedQuantity.value = newVal;
                     }
                 });
                 
-                // 監聽編輯數量的變化，標記為已手動編輯
                 watch(editedQuantity, () => {
-                    quantityManuallyEdited.value = true;
+                    if (document.activeElement.id === 'editedQuantity') {
+                       quantityManuallyEdited.value = true;
+                    }
                 });
                 
                 const hasPreviousUnitWeight = computed(() => 
@@ -412,27 +407,23 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     parseInt(editedQuantity.value) > 0
                 );
                 
-                // 選擇檢驗人員
                 const selectInspector = (inspectorId) => {
                     selectedInspectorId.value = inspectorId;
                     inspectorSelected.value = true;
                 };
                 
-                // 使用前一筆單重
                 const usePreviousUnitWeight = () => {
                     if (previousUnitWeight.value) {
                         unitWeight.value = previousUnitWeight.value;
-                        calculateQuantity();
                     }
                 };
                 
-                // 切換額外資訊顯示
                 const toggleAdditionalInfo = () => {
                     showAdditionalInfo.value = !showAdditionalInfo.value;
                 };
                 
-                // 獲取產品資訊
                 const fetchProductInfo = async () => {
+                    quantityManuallyEdited.value = false;
                     if (!barcode.value) {
                         showMessage('請輸入條碼編號', 'alert-warning');
                         return;
@@ -443,33 +434,31 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                         
                         if (response.data.success) {
                             productInfo.value = response.data.data;
-                            
-                            // 如果有現有的重量資料，則填入
+                            weight.value = 0;
+                            unitWeight.value = 0;
+                            editedQuantity.value = 0;
+
                             if (productInfo.value.重量 && parseFloat(productInfo.value.重量) > 0) {
                                 weight.value = parseFloat(productInfo.value.重量);
                             }
                             
-                            // 如果有現有的單重資料，則填入
                             if (productInfo.value.單重 && parseFloat(productInfo.value.單重) > 0) {
                                 unitWeight.value = parseFloat(productInfo.value.單重);
                             }
-                            // 如果有前一筆單重資料，保存起來
                             else if (productInfo.value.前一筆單重) {
                                 previousUnitWeight.value = parseFloat(productInfo.value.前一筆單重).toFixed(5);
-                                // 自動填入前一筆單重
                                 unitWeight.value = previousUnitWeight.value;
                             }
                             
-                            // 如果有現有的數量資料，則填入編輯數量
                             if (productInfo.value.數量 && parseInt(productInfo.value.數量) > 0) {
                                 editedQuantity.value = parseInt(productInfo.value.數量);
                                 quantityManuallyEdited.value = true;
                             }
                             
-                            calculateQuantity();
                             showMessage('成功獲取產品資訊', 'alert-success');
                         } else {
                             showMessage(response.data.message || '查無此條碼', 'alert-danger');
+                            productInfo.value = null;
                         }
                     } catch (error) {
                         console.error('獲取產品資訊錯誤:', error);
@@ -477,14 +466,11 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     }
                 };
                 
-                // 獲取重量
                 const getWeight = async () => {
                     try {
                         const response = await axios.get('backend/weight.php?action=getWeight');
-                        
                         if (response.data.success) {
                             weight.value = response.data.weight;
-                            calculateQuantity();
                             showMessage('成功獲取重量', 'alert-success');
                         } else {
                             showMessage(response.data.message || '無法獲取重量', 'alert-warning');
@@ -495,19 +481,23 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     }
                 };
                 
-                // 計算數量
-                const calculateQuantity = () => {
-                    // 如果數量未被手動編輯過，則更新編輯數量為計算結果
-                    if (!quantityManuallyEdited.value && calculatedQuantity.value > 0) {
-                        editedQuantity.value = calculatedQuantity.value;
-                    }
-                };
-                
-                // 提交資料
                 const submitData = async (status) => {
                     if (!canSubmit.value) {
                         showMessage('請填寫所有必要資訊', 'alert-warning');
                         return;
+                    }
+
+                    const totalRequired = parseInt(productInfo.value.工單數 || 0);
+                    const cumulativeQty = parseInt(productInfo.value.累計數量 || 0);
+                    const currentQty = parseInt(editedQuantity.value);
+
+                    if (totalRequired > 0 && (cumulativeQty + currentQty) > totalRequired) {
+                        const confirmation = confirm(
+                            `警告：此筆數量將使工單累計數量 (${cumulativeQty + currentQty}) 超過工單總數 (${totalRequired})。\n\n確定要送出嗎？`
+                        );
+                        if (!confirmation) {
+                            return;
+                        }
                     }
                     
                     try {
@@ -516,7 +506,7 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                             inspector: selectedInspectorId.value,
                             weight: weight.value,
                             unitWeight: unitWeight.value,
-                            quantity: parseInt(editedQuantity.value), // 使用編輯後的數量
+                            quantity: parseInt(editedQuantity.value),
                             status: status
                         };
                         
@@ -536,7 +526,6 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     }
                 };
                 
-                // 重置表單
                 const resetForm = () => {
                     barcode.value = '';
                     productInfo.value = null;
@@ -546,10 +535,8 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     showAdditionalInfo.value = false;
                     editedQuantity.value = 0;
                     quantityManuallyEdited.value = false;
-                    // 保留檢驗人員選擇
                 };
                 
-                // 全螢幕切換
                 const toggleFullScreen = () => {
                     if (!document.fullscreenElement) {
                         document.documentElement.requestFullscreen().catch(e => {
@@ -564,23 +551,18 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     }
                 };
                 
-                // 顯示訊息
                 const showMessage = (msg, type) => {
                     message.value = msg;
                     messageType.value = type;
                     
-                    // 3秒後自動清除訊息
                     setTimeout(() => {
                         message.value = '';
                         messageType.value = '';
                     }, 3000);
                 };
                 
-                // 生命週期鉤子
                 onMounted(() => {
-                    // 頁面載入後自動聚焦到條碼輸入框
                     document.addEventListener('keydown', (e) => {
-                        // 如果用戶在輸入框外按下數字或字母，自動聚焦到條碼輸入框
                         const tag = document.activeElement.tagName.toLowerCase();
                         if (tag !== 'input' && tag !== 'textarea' && e.key.length === 1) {
                             const barcodeInput = document.getElementById('barcode');
@@ -607,13 +589,12 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     isFullScreen,
                     displayWeight,
                     calculatedQuantity,
-                    editedQuantity, // 新增返回編輯數量
+                    editedQuantity,
                     canSubmit,
                     showAdditionalInfo,
                     selectInspector,
                     fetchProductInfo,
                     getWeight,
-                    calculateQuantity,
                     submitData,
                     resetForm,
                     toggleFullScreen,

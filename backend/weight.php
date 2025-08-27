@@ -140,6 +140,13 @@ function getProductInfo() {
                 }
             }
             
+            // Get cumulative quantity
+            $cumulSql = "SELECT SUM(數量) as 累計數量 FROM 生產紀錄表 WHERE 工單號 = ?";
+            $cumulStmt = $pdo->prepare($cumulSql);
+            $cumulStmt->execute([$result['工單號']]);
+            $cumulResult = $cumulStmt->fetch(PDO::FETCH_ASSOC);
+            $result['累計數量'] = $cumulResult['累計數量'] ?? 0;
+
             sendResponse(true, '查詢成功', $result);
         } else {
             // 原有的處理邏輯...
