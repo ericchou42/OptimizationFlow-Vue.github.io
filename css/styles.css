@@ -264,3 +264,10 @@
   .bi-arrow-repeat::before { content: "⟳"; }
   .bi-fullscreen::before { content: "⛶"; }
   .bi-fullscreen-exit::before { content: "⤢"; }
+
+/* 表格黃色警告背景 */
+.table-warning,
+.table-warning > th,
+.table-warning > td {
+    background-color: #fff3cd !important;
+}

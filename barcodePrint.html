@@ -4,239 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>條碼批量列印系統</title>
-    <link href="css/styles.css" rel="stylesheet">
+    <link href="css/styles.css?v=20250828" rel="stylesheet">
     <style>
-        /* 基本頁面樣式 */
         body {
             padding: 20px;
         }
-        
-        /* 載入中動畫樣式 */
-        .loading {
-            display: flex;
-            justify-content: center;
-            margin: 20px 0;
-        }
-        
-        /* 車台格子樣式 */
-        .car-cell {
-            font-weight: bold;
-            vertical-align: middle !important;
-            width: 10%; /* 自動縮至最小寬度 */
-            white-space: nowrap; /* 避免文字換行 */
-        }
-        
-        /* 主表格樣式設定 */
-        .main-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 0;
-            table-layout: auto; /* 關鍵設定：讓表格根據內容自動調整寬度 */
-        }
-        
-        /* 共用表頭樣式設定 */
-        .shared-header th {
-            background-color: #f8f9fa;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            padding: 8px;
-            border: 1px solid #dee2e6;
-            text-align: center;
-            font-weight: bold;
-            white-space: nowrap; /* 避免表頭文字換行 */
-        }
-        
-        /* 表格資料格樣式 */
-        .main-table td {
-            padding: 4px 8px;
-            border: 1px solid #dee2e6;
-            font-size: 0.9rem;
-            word-break: break-word;
-        }
-        
-        /* 無資料顯示樣式 */
-        .no-data {
-            text-align: center;
-            padding: 10px;
-            color: #6c757d;
-        }
-        
-        /* 各欄位寬度自動適應設定 */
-        .machine-history-cell {
-            width: auto; /* 自動寬度 */
-            max-width: none; /* 不限制最大寬度 */
-        }
-        
-        .workorder-cell {
-            width: auto; /* 自動寬度 */
-            max-width: none; /* 不限制最大寬度 */
-        }
-        
-        .date-cell {
-            width: 1%; /* 自動縮至最小寬度 */
-            text-align: center;
-            white-space: nowrap; /* 避免日期換行 */
-        }
-        
-        /* 表格容器設定，允許水平滾動 */
         .table-container {
             width: 100%;
             overflow-x: auto;
-            margin-bottom: 20px;
-            table-layout: auto;
         }
-        
-        /* 為了更好地處理長文字，確保它們能夠在必要時斷行 */
-        .wrap-content {
-            white-space: normal;
-            word-break: break-word;
+        .main-table th, .main-table td {
+            padding: 4px 8px;
+            vertical-align: middle;
+            text-align: center;
+            white-space: nowrap;
         }
-        
-        /* 儲存按鈕樣式 */
-        .save-btn {
-            font-size: 0.8rem;
-            padding: 2px 5px;
-            margin-left: 5px;
+        .box-count-input {
+            width: 60px;
+            text-align: center;
         }
-        
-        /* 修改成功樣式 */
-        .save-success {
-            background-color: #d4edda;
-            transition: background-color 0.5s;
-        }
-        
-        /* 修改失敗樣式 */
-        .save-error {
-            background-color: #f8d7da;
-            transition: background-color 0.5s;
-        }
-        
-        /* 除錯資訊 */
-        .debug-info {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-            display: none;
-        }
-        
-        .debug-toggle {
-            margin-top: 20px;
-            cursor: pointer;
-            color: #6c757d;
-            text-decoration: underline;
-        }
-        
-        /* 當前時間顯示 */
-        .current-time {
-            margin-bottom: 15px;
-            font-size: 0.9rem;
-            color: #6c757d;
-        }
-        
-        /* 批量控制區域樣式 */
         .batch-controls {
             margin-bottom: 15px;
             padding: 10px;
             background-color: #f0f0f0;
             border-radius: 5px;
         }
-        
-        .batch-controls label {
-            margin-right: 10px;
-            font-weight: bold;
-        }
-
-        /* 日期選擇器樣式 */
-        .date-picker {
-            padding: 5px;
-            border-radius: 4px;
-            border: 1px solid #ced4da;
-        }
-
-        /* 批量按鈕組 */
-        .batch-btn-group {
-            margin-bottom: 10px;
-        }
-        
-        /* 分區域控制 */
         .area-controls {
             margin-top: 15px;
             padding: 10px;
             background-color: #e9f7ef;
             border-radius: 5px;
         }
-        
-        .area-controls .area-btn {
-            margin-right: 10px;
-            margin-bottom: 5px;
-        }
-        
-        .area-controls .area-select-container {
-            margin-top: 10px;
-        }
-        
-        .area-controls .area-action-container {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-        }
-        
-        .box-count-input {
-            width: 60px;
-            text-align: center;
-        }
-        
-        /* 箱數批量按鈕 */
-        .box-count-btns {
-            display: flex;
-            margin-top: 10px;
-        }
-        
-        .box-count-btns button {
-            margin-right: 10px;
-        }
-        
-        /* 高亮選中的區域 */
-        .highlight {
-            background-color: #e7f3fe;
-        }
-        
-        /* 區域批量列印按鈕 */
-        .area-print-btn {
-            margin-top: 10px;
-            font-weight: bold;
-        }
-
-        /* 錯誤訊息容器 */
-        .error-details {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #fff3cd;
-            border-radius: 5px;
-            border: 1px solid #ffeeba;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 0.9rem;
-            max-height: 200px;
-            overflow-y: auto;
-        }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="container-fluid">
-            <!-- 班別和日期批量選擇控制區 -->
+            <!-- Controls -->
             <div class="batch-controls">
-                <div class="row">
+                 <div class="row">
                     <div class="col-md-4">
                         <label>批量設定日期：</label>
-                        <div>
-                            <input type="date" v-model="batchDate" class="date-picker" @change="setBatchDate">
-                            <!-- <button @click="setTodayDate" class="btn btn-outline-primary">今日</button> -->
-                        </div>
+                        <input type="date" v-model="batchDate" class="form-control d-inline-block" style="width: auto;" @change="setBatchDate">
                     </div>
                     <div class="col-md-4">
                         <label>批量設定班別：</label>
@@ -246,173 +55,108 @@
                             <button @click="setBatchShift('夜')" class="btn" :class="{'btn-primary': batchShift === '夜', 'btn-outline-primary': batchShift !== '夜'}">夜班</button>
                         </div>
                     </div>
-                    <div>
+                    <div class="col-md-4">
                         <label>批量設定箱數：</label>
-                        <div class="box-count-btns">
+                        <div class="btn-group">
                             <button @click="setBatchBoxCount(1)" class="btn btn-outline-primary">1</button>
                             <button @click="setBatchBoxCount(2)" class="btn btn-outline-primary">2</button>
                             <button @click="setBatchBoxCount(3)" class="btn btn-outline-primary">3</button>
                         </div>
                     </div>
                 </div>
-                
-                <!-- 分區域操作控制 -->
                 <div class="area-controls">
                     <div class="row">
                         <div class="col-12">
                             <label>選擇機台區域批量操作：</label>
                             <div>
-                                <button @click="selectArea('A')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'A', 'btn-outline-success': selectedArea !== 'A'}">A區</button>
-                                <button @click="selectArea('B')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'B', 'btn-outline-success': selectedArea !== 'B'}">B區</button>
-                                <button @click="selectArea('C')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'C', 'btn-outline-success': selectedArea !== 'C'}">C區</button>
-                                <button @click="selectArea('F')" class="btn btn-outline-success area-btn" :class="{'btn-success': selectedArea === 'F', 'btn-outline-success': selectedArea !== 'F'}">F區</button>
+                                <button @click="selectArea('A')" class="btn btn-sm" :class="{'btn-success': selectedArea === 'A', 'btn-outline-success': selectedArea !== 'A'}">A區</button>
+                                <button @click="selectArea('B')" class="btn btn-sm" :class="{'btn-success': selectedArea === 'B', 'btn-outline-success': selectedArea !== 'B'}">B區</button>
+                                <button @click="selectArea('C')" class="btn btn-sm" :class="{'btn-success': selectedArea === 'C', 'btn-outline-success': selectedArea !== 'C'}">C區</button>
+                                <button @click="selectArea('F')" class="btn btn-sm" :class="{'btn-success': selectedArea === 'F', 'btn-outline-success': selectedArea !== 'F'}">F區</button>
                             </div>
                         </div>
                     </div>
-                    <div class="row area-select-container" v-if="selectedArea">
+                    <div class="row mt-2" v-if="selectedArea">
                         <div class="col-md-6">
                             <label>為 {{ selectedArea }}區 選擇顧車人員：</label>
-                            <select v-model="areaOperator" class="form-control" @change="setAreaOperator">
-                                <option v-for="operator in operators" :key="operator" :value="operator">
-                                    {{ operator }}
-                                </option>
+                            <select v-model="areaOperator" class="form-control form-control-sm" @change="setAreaOperator">
+                                <option v-for="operator in operators" :key="operator" :value="operator">{{ operator }}</option>
                             </select>
                         </div>
-                        
-                        <!-- 新增區域批量列印按鈕和操作 -->
-                        <div class="col-12 area-action-container" v-if="selectedArea">
-                            <button @click="printAreaBarcodes" 
-                                    class="btn btn-lg btn-danger area-print-btn"
-                                    :disabled="!canPrintSelectedArea">
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button @click="printAreaBarcodes" class="btn btn-danger" :disabled="!canPrintSelectedArea">
                                 批量列印 {{ selectedArea }}區 條碼 ({{ selectedAreaMachineCount }} 台)
                             </button>
-                            <div v-if="!canPrintSelectedArea" class="alert alert-warning mt-2">
-                                請確保選擇的區域中所有機台都有工單號、顧車人員和日期
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- 載入中狀態顯示 -->
-            <div v-if="loading" class="loading">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">載入中...</span>
-                </div>
-                <span class="ms-2">資料載入中，請稍候...</span>
-            </div>
-            
-            <!-- 錯誤訊息顯示 -->
-            <div v-if="error" class="alert alert-danger">
-                {{ error }}
-            </div>
-            
-            <!-- 訊息通知 -->
-            <div v-if="message" class="alert" :class="messageType">
-                {{ message }}
-            </div>
-            
-            <!-- Python 錯誤訊息顯示 -->
-            <div v-if="pythonErrors" class="error-details">
-                <strong>列印錯誤詳情 (資料庫已更新)：</strong>
-                <pre>{{ pythonErrors }}</pre>
-            </div>
-            
-            <!-- 主要內容區域 -->
-            <div v-if="!loading && !error">
-                <!-- 表格區域，使用容器允許水平滾動 -->
-                <div class="table-container">
-                    <!-- 重新設計的主表格，使用table-layout: auto自動調整寬度 -->
-                    <table v-if="filteredData.length > 0" class="main-table table table-bordered">
-                        <!-- 共用表頭 -->
-                        <thead>
-                            <tr class="shared-header">
-                                <th>機台</th>
-                                <th>工單號</th>
-                                <th>品名</th>
-                                <th>日期</th>
-                                <th>顧車人員</th>
-                                <th>班別</th>
-                                <th>後續單位</th>
-                                <th>箱數</th>
-                                <th>列印箱號</th>
-                                <th>單張列印</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- 資料迴圈顯示 -->
-                            <template v-for="(item, index) in filteredData" :key="index">
-                                <tr :id="`row-${item.car}`" :class="{ 'highlight': item.car.startsWith(selectedArea) }">
-                                    <td class="car-cell">{{ item.car }}</td>
-                                    <td class="workorder-cell">{{ item.currentWorkOrder }}</td>
-                                    <td>{{ item.productName }}</td>
-                                    <td>
-                                        <input type="date" v-model="item.barcodeDate" class="form-control" @change="checkExistingBoxes(item)">
-                                    </td>
-                                    <td>
-                                        <select v-model="item.operator" class="form-control">
-                                            <option v-for="operator in operators" :key="operator" :value="operator">
-                                                {{ operator }}
-                                            </option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select v-model="item.shift" class="form-control" @change="checkExistingBoxes(item)">
-                                            <option value="日">日</option>
-                                            <option value="中">中</option>
-                                            <option value="夜">夜</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select v-model="item.nextUnit" class="form-control">
-                                            <option value="電">電</option>
-                                            <option value="加工">加工</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <input type="number" v-model="item.boxCount" class="form-control box-count-input" min="1" max="9" @change="validateBoxCount(item)">
-                                    </td>
-                                    <td>
-                                        <select v-model="item.reprintBoxCount" class="form-control">
-                                            <option v-for="n in 9" :key="n" :value="n.toString().padStart(2, '0')">
-                                                {{ n.toString().padStart(2, '0') }}
-                                            </option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <button @click="reprintBarcode(item)" 
-                                                class="btn btn-sm btn-success"
-                                                :disabled="!item.reprintBoxCount || !item.currentWorkOrder">
-                                            列印
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                    <!-- 如果沒有資料 -->
-                    <div v-else class="alert alert-info">
-                        沒有狀態為 '1' 的機台資料。請檢查資料庫中是否有機台狀態設定為 '1'。
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 除錯資訊切換按鈕 -->
-            <div class="debug-toggle" @click="toggleDebugInfo">{{ showDebugInfo ? '隱藏除錯資訊' : '顯示除錯資訊' }}</div>
-            
-            <!-- 除錯資訊區域 -->
-            <div class="debug-info" v-if="showDebugInfo" style="display: block;">
-                <h4>API 回應數據</h4>
-                <pre>{{ debugApiResponse }}</pre>
-                
-                <h4>資料處理後狀態</h4>
-                <pre>{{ JSON.stringify(filteredData, null, 2) }}</pre>
-                
-                <h4>現有箱數</h4>
-                <pre>{{ JSON.stringify(existingBoxes, null, 2) }}</pre>
-                
-                <h4>選中區域機台數量</h4>
-                <pre>{{ selectedAreaMachineCount }}</pre>
+            <!-- Loading / Error -->
+            <div v-if="loading" class="text-center p-4"><div class="spinner-border"></div></div>
+            <div v-if="error" class="alert alert-danger">{{ error }}</div>
+            <div v-if="message" class="alert" :class="messageType">{{ message }}</div>
+            <div v-if="pythonErrors" class="alert alert-warning"><pre>{{ pythonErrors }}</pre></div>
+
+            <!-- Main Table -->
+            <div v-if="!loading && !error" class="table-container">
+                <table class="table table-bordered table-sm main-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>機台</th>
+                            <th>工單號</th>
+                            <th>品名</th>
+                            <th>日期</th>
+                            <th>顧車人員</th>
+                            <th>班別</th>
+                            <th>後續單位</th>
+                            <th>工單數</th>
+                            <th>累計產數</th>
+                            <th>日產量</th>
+                            <th>箱數</th>
+                            <th>列印箱號</th>
+                            <th>單張列印</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in data" :key="item.car" :class="{ 'table-warning': item.isFinishingSoon }">
+                            <td>{{ item.car }}</td>
+                            <td>{{ item.currentWorkOrder }}</td>
+                            <td>{{ item.productName }}</td>
+                            <td><input type="date" v-model="item.barcodeDate" class="form-control form-control-sm"></td>
+                            <td>
+                                <select v-model="item.operator" class="form-control form-control-sm">
+                                    <option v-for="op in operators" :key="op" :value="op">{{ op }}</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select v-model="item.shift" class="form-control form-control-sm">
+                                    <option value="日">日</option>
+                                    <option value="中">中</option>
+                                    <option value="夜">夜</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select v-model="item.nextUnit" class="form-control form-control-sm">
+                                    <option value="電">電</option>
+                                    <option value="加工">加工</option>
+                                </select>
+                            </td>
+                            <td>{{ item.workOrderCount }}</td>
+                            <td>{{ item.cumulativeCount }}</td>
+                            <td>{{ item.dailyQuota }}</td>
+                            <td><input type="number" v-model.number="item.boxCount" class="form-control form-control-sm box-count-input" min="1" max="9"></td>
+                            <td>
+                                <select v-model="item.reprintBoxCount" class="form-control form-control-sm">
+                                    <option v-for="n in 9" :key="n" :value="String(n).padStart(2, '0')">{{ String(n).padStart(2, '0') }}</option>
+                                </select>
+                            </td>
+                            <td>
+                                <button @click="reprintBarcode(item)" class="btn btn-sm btn-success" :disabled="!item.reprintBoxCount || !item.currentWorkOrder">列印</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -420,617 +164,181 @@
     <script src="js/vue.min.js"></script>
     <script src="js/axios.min.js"></script>
     <script>
-        const { createApp, ref, computed, onMounted, watch } = Vue;
+        const { createApp, ref, computed, onMounted } = Vue;
 
-        const app = createApp({
+        createApp({
             setup() {
-                // 狀態變數
                 const data = ref([]);
                 const loading = ref(true);
                 const error = ref(null);
-                const machineStatuses = ref([]);
                 const message = ref('');
                 const messageType = ref('');
-                const debugApiResponse = ref('');
-                const showDebugInfo = ref(false);
-                const batchShift = ref('日'); // 預設批量班別為日班
-                const batchDate = ref(formatDateForInput(new Date())); // 預設批量日期為今天
-                const selectedArea = ref(''); // 選中的機台區域
-                const areaOperator = ref(''); // 區域選中的顧車人員
-                const pythonErrors = ref(''); // Python錯誤訊息
-                
-                // 顧車人員列表
-                const operators = ref(['黃志強', '吳俊龍', '洪昭南', '陳啟昌', '周堉澤', '李正良', '陳文琪', '林俊男', '劉原良', '楊松川', '郭泳宏', '黃富春', '盧志瑋', '阮文王']); 
-                
-                // 存儲每個機台已存在的箱數
-                const existingBoxes = ref({});
-                
-                // 日期格式化函數
-                function formatDateForInput(date) {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                }
-                
-                // 設定今天日期
-                const setTodayDate = () => {
-                    batchDate.value = formatDateForInput(new Date());
-                    setBatchDate();
-                };
-                
-                // 日期格式化為 YYYYMMDD
-                function formatDateYYYYMMDD(dateString) {
-                    if (!dateString) return '';
-                    return dateString.replace(/-/g, '');
-                }
-                
-                // 除錯資訊切換
-                const toggleDebugInfo = () => {
-                    showDebugInfo.value = !showDebugInfo.value;
-                };
-                
-                // 批量設定班別
-                const setBatchShift = (shift) => {
-                    batchShift.value = shift;
-                    // 將所有資料的班別設為選定值
-                    data.value.forEach(item => {
-                        item.shift = shift;
-                        checkExistingBoxes(item);
-                    });
-                    showMessage(`已將所有項目的班別設為${shift}班`, 'alert-success');
-                };
-                
-                // 批量設定日期
-                const setBatchDate = () => {
-                    // 將所有資料的日期設為選定值
-                    data.value.forEach(item => {
-                        item.barcodeDate = batchDate.value;
-                        checkExistingBoxes(item);
-                    });
-                    showMessage(`已將所有項目的日期設為${batchDate.value}`, 'alert-success');
-                };
-                
-                // 批量設定箱數
-                const setBatchBoxCount = (count) => {
-                    if (count < 1) count = 1;
-                    if (count > 3) count = 3;
-                    
-                    data.value.forEach(item => {
-                        item.boxCount = count;
-                    });
-                    
-                    showMessage(`已將所有項目的箱數設為 ${count}`, 'alert-success');
-                };
-                
-                // 監聽 batchShift 變化，自動更新所有項目的班別
-                watch(batchShift, (newValue) => {
-                    data.value.forEach(item => {
-                        item.shift = newValue;
-                        checkExistingBoxes(item);
-                    });
-                });
-                
-                // 選擇機台區域
-                const selectArea = (area) => {
-                    selectedArea.value = area;
-                    areaOperator.value = operators.value[0] || '';
-                };
-                
-                // 為選中區域設定顧車人員
-                const setAreaOperator = () => {
-                    if (!selectedArea.value || !areaOperator.value) return;
-                    
-                    const prefix = selectedArea.value;
-                    let count = 0;
-                    
-                    data.value.forEach(item => {
-                        if (item.car.startsWith(prefix)) {
-                            item.operator = areaOperator.value;
-                            count++;
-                        }
-                    });
-                    
-                    showMessage(`已將 ${prefix}區 的 ${count} 台機台設定為顧車人員: ${areaOperator.value}`, 'alert-success');
-                };
-                
-                // 獲取班別對應的數字 (1=日, 2=中, 3=夜)
-                const getShiftNumber = (shift) => {
-                    switch (shift) {
-                        case '日': return '1';
-                        case '中': return '2';
-                        case '夜': return '3';
-                        default: return '1';
-                    }
-                };
-                
-                // 驗證箱數
-                const validateBoxCount = (item) => {
-                    let count = parseInt(item.boxCount);
-                    
-                    // 確保值在1-9範圍內
-                    if (isNaN(count) || count < 1) count = 1;
-                    if (count > 9) count = 9;
-                    
-                    // 更新值
-                    item.boxCount = count;
-                };
-                
-                // 檢查箱數是否有效
-                const isValidBoxCount = (item) => {
-                    const count = parseInt(item.boxCount);
-                    return !isNaN(count) && count >= 1 && count <= 9;
-                };
-                
-                // 檢查已存在的箱數
-                const checkExistingBoxes = async (item) => {
-                    try {
-                        if (!item.currentWorkOrder || !item.car) return false;
-                        
-                        const dateStr = formatDateYYYYMMDD(item.barcodeDate);
-                        const shiftNum = getShiftNumber(item.shift);
-                        
-                        const response = await axios.post('./backend/barcodePrint.php?action=check_barcode', {
-                            car: item.car,
-                            workOrder: item.currentWorkOrder,
-                            date: dateStr,
-                            shift: shiftNum
-                        });
-                        
-                        if (response.data.success) {
-                            const key = `${item.currentWorkOrder}_${item.car}_${shiftNum}`;
-                            
-                            if (response.data.existingBoxes && Array.isArray(response.data.existingBoxes)) {
-                                existingBoxes.value[key] = response.data.existingBoxes;
-                            } else {
-                                existingBoxes.value[key] = [];
-                            }
-                        }
-                        
-                        return response.data.exists;
-                    } catch (err) {
-                        console.error('檢查條碼失敗:', err);
-                        return false;
-                    }
-                };
+                const pythonErrors = ref('');
+                const batchShift = ref('日');
+                const batchDate = ref(new Date().toISOString().slice(0, 10));
+                const selectedArea = ref('');
+                const areaOperator = ref('');
+                const operators = ref(['黃志強', '吳俊龍', '洪昭南', '陳啟昌', '周堉澤', '李正良', '陳文琪', '林俊男', '劉原良', '楊松川', '郭泳宏', '黃富春', '盧志瑋', '阮文王']);
 
-                // 批量列印條碼 (單個機台) - 修改以更好地處理錯誤訊息
-                const batchPrintBarcode = async (item) => {
-                    if (!item.currentWorkOrder) {
-                        return { success: false, message: '無工單號，無法列印', dataUpdated: false };
-                    }
-                    
-                    if (!item.operator) {
-                        return { success: false, message: '請選擇僱車人員', dataUpdated: false };
-                    }
-                    
-                    if (!item.barcodeDate) {
-                        return { success: false, message: '請選擇日期', dataUpdated: false };
-                    }
-                    
-                    if (!isValidBoxCount(item)) {
-                        return { success: false, message: '箱數無效，必須是1-9之間的數字', dataUpdated: false };
-                    }
-                    
-                    try {
-                        const dateStr = formatDateYYYYMMDD(item.barcodeDate);
-                        const shiftNum = getShiftNumber(item.shift);
-                        const boxCount = parseInt(item.boxCount);
-                        
-                        const printResponse = await axios.post('./backend/barcodePrint.php?action=print_box_count', {
-                            car: item.car,
-                            workOrder: item.currentWorkOrder,
-                            productName: item.productName,
-                            boxCount: boxCount,
-                            operator: item.operator,
-                            nextUnit: item.nextUnit || '電',
-                            shift: item.shift || '日',
-                            date: dateStr,
-                            shiftNumber: shiftNum
-                        });
-                        
-                        // 檢查是否成功
-                        if (printResponse.data.success) {
-                            // 更新本地狀態
-                            await checkExistingBoxes(item);
-                            return { 
-                                success: true, 
-                                message: `機台 ${item.car} 批量列印成功，共 ${boxCount} 張標籤`,
-                                dataUpdated: true
-                            };
-                        } else {
-                            // 檢查資料庫是否已更新
-                            const dataUpdated = printResponse.data.dataUpdated || false;
-                            
-                            return { 
-                                success: false, 
-                                message: `機台 ${item.car} 列印失敗: ${printResponse.data.error || '未知錯誤'}`,
-                                dataUpdated,
-                                pyError: printResponse.data.error || null
-                            };
-                        }
-                        
-                    } catch (err) {
-                        return { 
-                            success: false, 
-                            message: `機台 ${item.car} 列印失敗: ${err.message}`,
-                            dataUpdated: false
-                        };
-                    }
-                };
-                
-                // 區域批量列印功能 - 修改以更好地處理錯誤訊息
-                const printAreaBarcodes = async () => {
-                    if (!selectedArea.value) {
-                        showMessage('請先選擇一個機台區域', 'alert-danger');
-                        return;
-                    }
-                    
-                    // 清除之前的Python錯誤
-                    pythonErrors.value = '';
-                    
-                    // 獲取該區域的所有機台
-                    const areaMachines = filteredData.value.filter(item => 
-                        item.car.startsWith(selectedArea.value)
-                    );
-                    
-                    if (areaMachines.length === 0) {
-                        showMessage(`${selectedArea.value}區沒有狀態為 '1' 的機台`, 'alert-danger');
-                        return;
-                    }
-                    
-                    // 檢查所有機台是否都有工單和顧車人員
-                    const invalidMachines = areaMachines.filter(item => 
-                        !item.currentWorkOrder || !item.operator || !item.barcodeDate || !isValidBoxCount(item)
-                    );
-                    
-                    if (invalidMachines.length > 0) {
-                        const machineList = invalidMachines.map(m => m.car).join(', ');
-                        showMessage(`以下機台缺少必要資料: ${machineList}`, 'alert-danger');
-                        return;
-                    }
-                    
-                    // 開始批量列印
-                    loading.value = true;
-                    showMessage(`正在為 ${selectedArea.value}區 批量列印 ${areaMachines.length} 台機台的條碼...`, 'alert-info');
-                    
-                    const results = [];
-                    const successes = [];
-                    const failures = [];
-                    const dataUpdatedButPrintFailed = [];
-                    
-                    for (const machine of areaMachines) {
-                        const result = await batchPrintBarcode(machine);
-                        results.push(result);
-                        
-                        if (result.success) {
-                            successes.push(machine.car);
-                        } else {
-                            if (result.dataUpdated) {
-                                // 資料庫已更新但列印失敗
-                                dataUpdatedButPrintFailed.push({
-                                    car: machine.car, 
-                                    error: result.pyError || '未知錯誤'
-                                });
-                            } else {
-                                // 完全失敗
-                                failures.push({
-                                    car: machine.car, 
-                                    error: result.message
-                                });
-                            }
-                        }
-                    }
-                    
-                    loading.value = false;
-                    
-                    // 顯示結果摘要 - 優化錯誤處理訊息
-                    if (failures.length === 0 && dataUpdatedButPrintFailed.length === 0) {
-                        // 全部成功
-                        showMessage(`成功列印 ${selectedArea.value}區所有 ${successes.length} 台機台的條碼`, 'alert-success');
-                    } else if (successes.length === 0 && dataUpdatedButPrintFailed.length === 0) {
-                        // 全部失敗且資料庫也未更新
-                        showMessage(`所有 ${failures.length} 台機台列印失敗`, 'alert-danger');
-                    } else {
-                        // 混合結果
-                        let message = '';
-                        
-                        if (successes.length > 0) {
-                            message += `${successes.length} 台成功列印、`;
-                        }
-                        
-                        if (dataUpdatedButPrintFailed.length > 0) {
-                            message += `${dataUpdatedButPrintFailed.length} 台資料已更新但列印失敗、`;
-                        }
-                        
-                        if (failures.length > 0) {
-                            message += `${failures.length} 台完全失敗、`;
-                        }
-                        
-                        // 移除最後的逗號
-                        message = message.replace(/、$/, '');
-                        
-                        showMessage(`部分列印結果: ${message}`, 'alert-warning');
-                    }
-                    
-                    // 處理Python錯誤訊息
-                    if (dataUpdatedButPrintFailed.length > 0) {
-                        const pyErrors = dataUpdatedButPrintFailed.map(item => 
-                            `機台 ${item.car}: ${item.error}`
-                        ).join('\n\n');
-                        
-                        console.error('列印錯誤 (資料已更新):', pyErrors);
-                        
-                        // 顯示Python錯誤訊息
-                        pythonErrors.value = pyErrors;
-                        
-                        // 將Python錯誤訊息添加到調試區域
-                        debugApiResponse.value += '\n\n--- Python列印錯誤 ---\n' + pyErrors;
-                    }
-                    
-                    // 在除錯區域顯示詳細信息
-                    debugApiResponse.value = JSON.stringify({
-                        area: selectedArea.value,
-                        total: areaMachines.length,
-                        successes,
-                        dataUpdatedButPrintFailed: dataUpdatedButPrintFailed.map(f => f.car),
-                        failures: failures.map(f => f.car)
-                    }, null, 2);
-                };
-
-                // 單張重印功能
-                const reprintBarcode = async (item) => {
-                    if (!item.currentWorkOrder) {
-                        showMessage('無工單號，無法重印', 'alert-danger');
-                        return;
-                    }
-                    
-                    if (!item.barcodeDate) {
-                        showMessage('請選擇日期', 'alert-danger');
-                        return;
-                    }
-                    
-                    if (!item.reprintBoxCount) {
-                        showMessage('請選擇要重印的箱數', 'alert-danger');
-                        return;
-                    }
-                    
-                    try {
-                        const dateStr = formatDateYYYYMMDD(item.barcodeDate);
-                        const shiftNum = getShiftNumber(item.shift);
-                        
-                        const response = await axios.post('./backend/barcodePrint.php?action=reprint_barcode', {
-                            car: item.car,
-                            workOrder: item.currentWorkOrder,
-                            productName: item.productName,
-                            boxNumber: item.reprintBoxCount,
-                            operator: item.operator || '',
-                            nextUnit: item.nextUnit || '電',
-                            shift: item.shift || '日',
-                            date: dateStr,
-                            shiftNumber: shiftNum
-                        });
-                        
-                        if (response.data.success) {
-                            showMessage('重印成功', 'alert-success');
-                        } else {
-                            // 檢查是否資料庫已更新但列印失敗
-                            if (response.data.dataUpdated) {
-                                showMessage('資料已更新但列印失敗: ' + response.data.error, 'alert-warning');
-                                // 顯示Python錯誤訊息
-                                pythonErrors.value = response.data.error || '未知列印錯誤';
-                            } else {
-                                showMessage(response.data.error, 'alert-danger');
-                            }
-                        }
-                        
-                    } catch (err) {
-                        showMessage(`重印失敗: ${err.message}`, 'alert-danger');
-                    }
-                };
-
-                // 搜尋過濾功能
-                const filteredData = computed(() => {
-                    if (!Array.isArray(data.value)) return [];
-                    return data.value.filter(item => item.currentStatus === '1');
-                });
-                
-                // 計算選中區域的機台數量
                 const selectedAreaMachineCount = computed(() => {
-                    if (!selectedArea.value || !Array.isArray(filteredData.value)) return 0;
-                    return filteredData.value.filter(item => 
-                        item.car.startsWith(selectedArea.value)
-                    ).length;
+                    if (!selectedArea.value) return 0;
+                    return data.value.filter(item => item.car.startsWith(selectedArea.value)).length;
                 });
-                
-                // 判斷選中區域是否可以列印
+
                 const canPrintSelectedArea = computed(() => {
-                    if (!selectedArea.value || !Array.isArray(filteredData.value) || selectedAreaMachineCount.value === 0) {
-                        return false;
-                    }
-                    
-                    // 檢查選中區域的所有機台是否有必要資料
-                    const areaMachines = filteredData.value.filter(item => 
-                        item.car.startsWith(selectedArea.value)
-                    );
-                    
-                    return areaMachines.every(item => 
-                        item.currentWorkOrder && 
-                        item.operator && 
-                        item.barcodeDate && 
-                        isValidBoxCount(item)
-                    );
+                    if (!selectedArea.value || selectedAreaMachineCount.value === 0) return false;
+                    const areaMachines = data.value.filter(item => item.car.startsWith(selectedArea.value));
+                    return areaMachines.every(item => item.currentWorkOrder && item.operator && item.barcodeDate && item.boxCount > 0);
                 });
-                
-                // 修正過的 fetchData 函數
+
+                function formatDateYYYYMMDD(dateString) {
+                    return dateString ? dateString.replace(/-/g, '') : '';
+                }
+
+                function getShiftNumber(shift) {
+                    return { '日': '1', '中': '2', '夜': '3' }[shift] || '1';
+                }
+
+                const showMessage = (msg, type, duration = 3000) => {
+                    message.value = msg;
+                    messageType.value = type;
+                    if (duration > 0) {
+                        setTimeout(() => { message.value = ''; }, duration);
+                    }
+                };
+
                 const fetchData = async () => {
                     try {
                         loading.value = true;
-                        
-                        // 傳遞一個時間戳參數避免緩存
-                        const timestamp = new Date().getTime();
-                        const response = await axios.get(`./backend/barcodePrint.php?t=${timestamp}`);
-                        
-                        // 保存原始 API 響應用於除錯
-                        debugApiResponse.value = JSON.stringify(response.data, null, 2);
-                        console.log('API 回應數據:', response.data);
-                        
+                        error.value = null;
+                        const response = await axios.get(`./backend/barcodePrint.php?t=${new Date().getTime()}`);
                         if (response.data.error) {
-                            error.value = response.data.error;
-                            return;
+                            throw new Error(response.data.error);
                         }
-                        
-                        // 確認回應是否為有效的數組
-                        if (!Array.isArray(response.data)) {
-                            let rawData;
-                            try {
-                                // 嘗試解析可能是字符串的 JSON
-                                if (typeof response.data === 'string') {
-                                    rawData = JSON.parse(response.data);
-                                    if (Array.isArray(rawData)) {
-                                        // 成功解析為數組
-                                        console.log('成功解析字符串為數組');
-                                    } else {
-                                        error.value = '伺服器返回的數據不是數組格式';
-                                        return;
-                                    }
-                                } else {
-                                    error.value = '伺服器返回的數據格式不正確';
-                                    return;
-                                }
-                            } catch (e) {
-                                console.error('解析響應失敗:', e);
-                                error.value = '伺服器返回的數據格式無法解析';
-                                return;
-                            }
-                        }
-                        
-                        // 處理有效的數組數據
-                        const validData = Array.isArray(response.data) ? response.data : [];
-                        
-                        if (validData.length === 0) {
-                            console.log('警告: 伺服器返回空數組');
-                            data.value = [];
-                        } else {
-                            // 設定今天日期
-                            const today = formatDateForInput(new Date());
-                            
-                            // 確保每個項目都有正確的欄位值
-                            data.value = validData.map(item => {
-                                return {
-                                    ...item,
-                                    currentStatus: item.currentStatus || 'B',
-                                    isPrinted: false,
-                                    boxCount: 1,  // 預設為1
-                                    reprintBoxCount: '01',
-                                    // 使用批量設定的班別
-                                    shift: batchShift.value,
-                                    // 新增後續單位欄位，預設為電
-                                    nextUnit: item.nextUnit || '電',
-                                    // 新增日期欄位，預設為今天
-                                    barcodeDate: batchDate.value,
-                                    // 預設選擇第一個顧車人員
-                                    operator: operators.value[0] || ''
-                                };
-                            });
-                            
-                            // 檢查每個項目的箱數狀態
-                            for (const item of data.value) {
-                                if (item.currentWorkOrder) {
-                                    await checkExistingBoxes(item);
-                                }
-                            }
-                        }
+                        data.value = response.data.map(item => ({
+                            ...item,
+                            boxCount: 1, // Set default box count to 1
+                            reprintBoxCount: '01',
+                            shift: batchShift.value,
+                            nextUnit: '電',
+                            barcodeDate: batchDate.value,
+                            operator: operators.value[0] || ''
+                        }));
                     } catch (err) {
-                        console.error('獲取數據錯誤:', err);
                         error.value = `獲取數據失敗: ${err.message}`;
-                        
-                        // 嘗試記錄響應內容以便調試
-                        if (err.response) {
-                            debugApiResponse.value = JSON.stringify({
-                                status: err.response.status,
-                                headers: err.response.headers,
-                                data: err.response.data
-                            }, null, 2);
-                        } else {
-                            debugApiResponse.value = `沒有響應對象: ${err.message}`;
-                        }
+                        console.error(err);
                     } finally {
                         loading.value = false;
                     }
                 };
 
-                // 獲取機台狀態下拉選單資料
-                const fetchMachineStatuses = async () => {
-                    try {
-                        const response = await axios.get('./backend/barcodePrint.php?action=get_machine_status');
-                        if (response.data.error) {
-                            error.value = response.data.error;
-                        } else {
-                            machineStatuses.value = response.data;
+                const setBatchShift = (shift) => {
+                    batchShift.value = shift;
+                    data.value.forEach(item => { item.shift = shift; });
+                };
+
+                const setBatchDate = () => {
+                    data.value.forEach(item => { item.barcodeDate = batchDate.value; });
+                };
+
+                const setBatchBoxCount = (count) => {
+                    data.value.forEach(item => { item.boxCount = count; });
+                };
+
+                const selectArea = (area) => {
+                    selectedArea.value = area;
+                    areaOperator.value = operators.value[0] || '';
+                };
+
+                const setAreaOperator = () => {
+                    if (!selectedArea.value || !areaOperator.value) return;
+                    data.value.forEach(item => {
+                        if (item.car.startsWith(selectedArea.value)) {
+                            item.operator = areaOperator.value;
                         }
-                    } catch (err) {
-                        error.value = `獲取機台狀態數據失敗: ${err.message}`;
+                    });
+                };
+
+                const printAreaBarcodes = async () => {
+                    if (!canPrintSelectedArea.value) return;
+                    const areaMachines = data.value.filter(item => item.car.startsWith(selectedArea.value));
+                    showMessage(`正在為 ${selectedArea.value}區 批量列印 ${areaMachines.length} 台機台的條碼...`, 'alert-info', 0);
+                    pythonErrors.value = '';
+                    let errors = [];
+
+                    for (const item of areaMachines) {
+                        const res = await print(item);
+                        if (!res.success) {
+                            errors.push(res.message);
+                        }
+                    }
+                    message.value = ''; // Clear loading message
+                    if (errors.length > 0) {
+                        pythonErrors.value = errors.join('\n\n');
                     }
                 };
-                
-                // 顯示訊息
-                const showMessage = (msg, type) => {
-                    message.value = msg;
-                    messageType.value = type;
-                    
-                    // 3秒後自動清除訊息
-                    setTimeout(() => {
-                        message.value = '';
-                        messageType.value = '';
-                    }, 3000);
+
+                const reprintBarcode = async (item) => {
+                    const res = await print(item, true);
+                    if (res.success) {
+                        showMessage('重印成功', 'alert-success');
+                    } else {
+                        showMessage(res.message, 'alert-danger');
+                    }
                 };
-                
-                // 頁面載入時獲取數據
-                onMounted(() => {
-                    fetchMachineStatuses().then(() => {
-                        fetchData();
-                    }).catch(err => {
-                        error.value = `初始化失敗: ${err.message}`;
-                    });
-                });
+
+                const print = async (item, isReprint = false) => {
+                    const action = isReprint ? 'reprint_barcode' : 'print_box_count';
+                    const payload = {
+                        car: item.car,
+                        workOrder: item.currentWorkOrder,
+                        productName: item.productName,
+                        boxCount: isReprint ? 1 : item.boxCount,
+                        boxNumber: isReprint ? item.reprintBoxCount : null,
+                        operator: item.operator,
+                        nextUnit: item.nextUnit,
+                        shift: item.shift,
+                        date: formatDateYYYYMMDD(item.barcodeDate),
+                        shiftNumber: getShiftNumber(item.shift)
+                    };
+                    try {
+                        const response = await axios.post(`./backend/barcodePrint.php?action=${action}`, payload);
+                        if (response.data.success) {
+                            return { success: true };
+                        } else {
+                            return { success: false, message: `機台 ${item.car}: ${response.data.error}` };
+                        }
+                    } catch (err) {
+                        return { success: false, message: `機台 ${item.car} 請求失敗: ${err.message}` };
+                    }
+                };
+
+                onMounted(fetchData);
 
                 return {
                     data,
                     loading,
                     error,
-                    filteredData,
                     message,
                     messageType,
-                    machineStatuses,
-                    reprintBarcode,
-                    debugApiResponse,
-                    showDebugInfo,
-                    toggleDebugInfo,
+                    pythonErrors,
                     batchShift,
-                    setBatchShift,
-                    operators,
                     batchDate,
-                    setBatchDate,
-                    setTodayDate,
-                    checkExistingBoxes,
-                    existingBoxes,
-                    validateBoxCount,
-                    isValidBoxCount,
-                    setBatchBoxCount,
                     selectedArea,
                     areaOperator,
-                    selectArea,
-                    setAreaOperator,
+                    operators,
                     selectedAreaMachineCount,
                     canPrintSelectedArea,
+                    setBatchShift,
+                    setBatchDate,
+                    setBatchBoxCount,
+                    selectArea,
+                    setAreaOperator,
                     printAreaBarcodes,
-                    pythonErrors
+                    reprintBarcode
                 };
             }
-        });
-
-        app.mount('#app');
+        }).mount('#app');
     </script>
 </body>
 </html>
