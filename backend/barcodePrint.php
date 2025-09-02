@@ -53,6 +53,7 @@ function getCarData() {
         $sql_machines = "SELECT md.機台 as 車台號, md.狀態, md.工單號, ms.狀態 as 狀態名稱
                          FROM 機台看板 md 
                          LEFT JOIN 機台狀態 ms ON md.狀態 = ms.代碼
+                         WHERE md.狀態 = '1'
                          ORDER BY md.機台";
         $stmt_machines = $pdo->prepare($sql_machines);
         $stmt_machines->execute();
