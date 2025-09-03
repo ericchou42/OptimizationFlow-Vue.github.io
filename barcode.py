@@ -11,12 +11,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 設定日誌記錄
-logging.basicConfig(
-    filename='/tmp/barcode_log.txt',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    encoding='utf-8'  # 添加明確的編碼設定
-)
+# logging.basicConfig(
+#     filename='/tmp/barcode_log.txt',
+#     level=logging.INFO,
+#     format='%(asctime)s - %(levelname)s - %(message)s',
+#     encoding='utf-8'  # 添加明確的編碼設定
+# )
 
 def connect_to_database():
     try:
@@ -90,7 +90,7 @@ def print_zebra_label(data, barcode_id):
         # 定義標籤參數
         # XY軸位置
         x_position = 60
-        x_position_right = 650
+        x_position_right = 550
         y_position = 50
 
         # 條碼高度和模組寬度
@@ -106,7 +106,7 @@ def print_zebra_label(data, barcode_id):
         zpl_command += "^CI28" # 使用 Big5 編碼 (台灣繁體中文)
         
         # 設定條碼起始位置
-        zpl_command += f"^FO{x_position},{y_position}" 
+        zpl_command += f"^FO{100},{y_position}" 
 
         # 添加工單號條碼尺寸
         zpl_command += f"^BY{module_width}"
@@ -157,16 +157,16 @@ def print_zebra_label(data, barcode_id):
 
         # 機台 - 保持原來的位置
         zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 200}"
-        zpl_command += "^A@N,60,60,E:ARIAL.TTF"
+        zpl_command += "^A@N,80,80,E:ARIAL.TTF"
         zpl_command += f"^FD機台:{data['機台']}^FS"
 
         # 箱數 - 固定位置在y軸500
-        zpl_command += f"^FO{x_position_right},{y_position + barcode_height + 500}"
+        zpl_command += f"^FO{700},{y_position + barcode_height + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD箱數:{data['箱數']}^FS"
 
         # 工序
-        zpl_command += f"^FO{350},{y_position + barcode_height + 500}"
+        zpl_command += f"^FO{400},{y_position + barcode_height + 500}"
         zpl_command += "^A@N,60,60,E:ARIAL.TTF"
         zpl_command += f"^FD工序:10^FS"
 
