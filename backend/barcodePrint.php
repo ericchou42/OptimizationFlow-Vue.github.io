@@ -1,6 +1,6 @@
 <?php
-ini_set('display_errors', 0);
-ini_set('display_startup_errors', 0);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 $env_path = __DIR__ . '/../.env';
@@ -39,7 +39,6 @@ function getMachineStatus() {
         $statuses = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($statuses, JSON_UNESCAPED_UNICODE);
     } catch (PDOException $e) {
-        error_log('機台狀態查詢失敗: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['error' => '查詢失敗: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
@@ -123,7 +122,6 @@ function getCarData() {
         echo json_encode($result, JSON_UNESCAPED_UNICODE);
 
     } catch (PDOException $e) {
-        error_log('數據庫錯誤: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['error' => '查詢失敗: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
@@ -181,7 +179,6 @@ function print_box_count() {
             exec($command, $output, $returnVar);
             if ($returnVar !== 0) {
                 $printErrors[] = "箱號 {" . $barcode['boxNumber'] . "} 列印失敗: " . implode("\n", $output);
-                error_log('Print error: ' . implode("\n", $output));
             }
         }
         
@@ -193,8 +190,9 @@ function print_box_count() {
         echo json_encode(['success' => true, 'message' => "批量列印成功，共 {" . $boxCount . "} 張標籤"], JSON_UNESCAPED_UNICODE);
         
     } catch (PDOException $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        error_log('資料庫錯誤: ' . $e->getMessage());
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => '資料庫處理失敗: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
@@ -218,22 +216,40 @@ function reprintBarcode() {
         $shift = $data['shift'] ?? '日';
         $date = $data['date'] ?? date('Ymd');
         $shiftNumber = $data['shiftNumber'] ?? '1';
+        $nextUnit = $data['nextUnit'] ?? '電';
         $barcodeId = $date . $workOrder . $car . $shiftNumber . $boxNumber;
         
+        // --- Database Logic ---
+        $checkSql = "SELECT 條碼編號 FROM 生產紀錄表 WHERE 條碼編號 = ?";
+        $checkStmt = $pdo->prepare($checkSql);
+        $checkStmt->execute([$barcodeId]);
+        
+        if ($checkStmt->rowCount() == 0) {
+            $insertSql = "INSERT INTO 生產紀錄表 (條碼編號, 工單號, 品名, 機台, 箱數, 顧車, 班別, 後續單位) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $insertStmt = $pdo->prepare($insertSql);
+            $insertStmt->execute([$barcodeId, $workOrder, $productName, $car, $boxNumber, $operator, $shift, $nextUnit]);
+        } else {
+            $updateSql = "UPDATE 生產紀錄表 SET 品名 = ?, 顧車 = ?, 班別 = ?, 後續單位 = ? WHERE 條碼編號 = ?";
+            $updateStmt = $pdo->prepare($updateSql);
+            $updateStmt->execute([$productName, $operator, $shift, $nextUnit, $barcodeId]);
+        }
+        // --- End Database Logic ---
+
         $command = '"' . PYTHON_PATH . '" "' . BARCODE_SCRIPT_PATH . '" ' . escapeshellarg($barcodeId) . " " . escapeshellarg($workOrder) . " " . escapeshellarg($productName) . " " . escapeshellarg($operator) . " " . escapeshellarg($car) . " " . escapeshellarg($boxNumber) . " " . escapeshellarg($shift);
         
         exec($command, $output, $returnVar);
         
         if ($returnVar !== 0) {
-            error_log('Reprint error: ' . implode("\n", $output));
-            echo json_encode(['success' => false, 'error' => '重印失敗: ' . implode("\n", $output), 'dataUpdated' => true], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => false, 'error' => '列印失敗: ' . implode("\n", $output), 'dataUpdated' => true, 'message' => '資料庫更新成功，但列印失敗。'], JSON_UNESCAPED_UNICODE);
             return;
         }
         
-        echo json_encode(['success' => true, 'message' => '重印成功'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => true, 'message' => '資料更新並列印成功'], JSON_UNESCAPED_UNICODE);
         
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => '資料庫處理失敗: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     } catch (Exception $e) {
-        error_log('重印條碼錯誤: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => '處理失敗: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
@@ -266,7 +282,6 @@ function checkBarcode() {
         echo json_encode(['success' => true, 'exists' => !empty($boxNumbers), 'existingBoxes' => $boxNumbers], JSON_UNESCAPED_UNICODE);
         
     } catch (PDOException $e) {
-        error_log('檢查條碼錯誤: ' . $e->getMessage());
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => '檢查失敗: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
