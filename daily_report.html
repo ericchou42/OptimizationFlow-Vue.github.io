@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>每日生產彙總報表</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="css/styles.css" rel="stylesheet">
     <style>
         body {
@@ -43,9 +44,14 @@
                 <label for="report-date">選擇報表日期:</label>
                 <input type="date" id="report-date" class="form-control d-inline-block" style="width: auto;" v-model="selectedDate" @change="fetchReportData">
             </div>
-            <button class="btn btn-success" @click="saveAllWeights" :disabled="!reportData.length">
-                <i class="bi bi-save"></i> 儲存全部單重
-            </button>
+            <div>
+                <button class="btn btn-primary me-2" @click="exportToExcel" :disabled="!reportData.length">
+                    <i class="bi bi-file-earmark-excel"></i> 匯出 Excel
+                </button>
+                <button class="btn btn-success" @click="saveAllWeights" :disabled="!reportData.length">
+                    <i class="bi bi-save"></i> 儲存全部單重
+                </button>
+            </div>
         </div>
 
         <!-- Loading Indicator -->
@@ -133,6 +139,7 @@
 
     <script src="js/vue.min.js"></script>
     <script src="js/axios.min.js"></script>
+    <script src="js/xlsx.full.min.js"></script>
     <script>
         const { createApp, ref, onMounted } = Vue;
 
@@ -204,6 +211,46 @@
                     }, 3000);
                 };
 
+                const exportToExcel = () => {
+                    if (!reportData.value.length) {
+                        showMessage('沒有資料可以匯出', 'alert-warning');
+                        return;
+                    }
+
+                    const columnOrder = [
+                        '機台', '品名', 
+                        '日班淨重1', '日班淨重2', '日班淨重3', '日班淨重4',
+                        '夜班淨重1', '夜班淨重2', '夜班淨重3', '夜班淨重4',
+                        '單重', '日班數量', '夜班數量', '合計', 
+                        '前日數量', '累計', '工單號碼', 'NP碼'
+                    ];
+
+                    const dataToExport = reportData.value.map(row => {
+                        const newRow = {};
+                        columnOrder.forEach(key => {
+                            newRow[key] = row[key] !== null && row[key] !== undefined ? row[key] : '';
+                        });
+                        return newRow;
+                    });
+
+                    const ws = XLSX.utils.json_to_sheet(dataToExport, { header: columnOrder });
+
+                    const colWidths = columnOrder.map(key => {
+                        const maxLength = Math.max(
+                            String(key).length,
+                            ...dataToExport.map(row => String(row[key]).length)
+                        );
+                        return { wch: maxLength + 2 };
+                    });
+                    ws['!cols'] = colWidths;
+                    
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, '每日生產彙總');
+
+                    const fileName = `每日生產彙總報表_${selectedDate.value}.xlsx`;
+                    XLSX.writeFile(wb, fileName);
+                };
+
                 onMounted(() => {
                     fetchReportData();
                 });
@@ -219,6 +266,7 @@
                     showDebug,
                     fetchReportData,
                     saveAllWeights,
+                    exportToExcel,
                 };
             }
         }).mount('#app');
