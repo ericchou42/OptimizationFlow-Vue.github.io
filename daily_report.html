@@ -33,6 +33,9 @@
         .weight-group th {
             background-color: #f2f2f2;
         }
+        .main-table td.text-danger {
+            color: #dc3545 !important;
+        }
     </style>
 </head>
 <body>
@@ -97,14 +100,14 @@
                     <tr v-for="row in reportData" :key="row.機台 + row.工單號碼">
                         <td>{{ row.機台 }}</td>
                         <td>{{ row.品名 }}</td>
-                        <td>{{ row.日班淨重1 }}</td>
-                        <td>{{ row.日班淨重2 }}</td>
-                        <td>{{ row.日班淨重3 }}</td>
-                        <td>{{ row.日班淨重4 }}</td>
-                        <td>{{ row.夜班淨重1 }}</td>
-                        <td>{{ row.夜班淨重2 }}</td>
-                        <td>{{ row.夜班淨重3 }}</td>
-                        <td>{{ row.夜班淨重4 }}</td>
+                        <td :class="{'text-danger': row.日班淨重1_status === '異常'}">{{ row.日班淨重1 }}</td>
+                        <td :class="{'text-danger': row.日班淨重2_status === '異常'}">{{ row.日班淨重2 }}</td>
+                        <td :class="{'text-danger': row.日班淨重3_status === '異常'}">{{ row.日班淨重3 }}</td>
+                        <td :class="{'text-danger': row.日班淨重4_status === '異常'}">{{ row.日班淨重4 }}</td>
+                        <td :class="{'text-danger': row.夜班淨重1_status === '異常'}">{{ row.夜班淨重1 }}</td>
+                        <td :class="{'text-danger': row.夜班淨重2_status === '異常'}">{{ row.夜班淨重2 }}</td>
+                        <td :class="{'text-danger': row.夜班淨重3_status === '異常'}">{{ row.夜班淨重3 }}</td>
+                        <td :class="{'text-danger': row.夜班淨重4_status === '異常'}">{{ row.夜班淨重4 }}</td>
                         <td>
                             <input type="number" class="form-control unit-weight-input" v-model="row.單重" step="0.00001" min="0">
                         </td>

@@ -22,17 +22,18 @@ function getDailyReportData($pdo) {
     $prevDateYmd = date('Ymd', strtotime($date . ' -1 day'));
 
     try {
-        // Corrected query based on user feedback
+        // Corrected query to use '異常' column instead of '狀態'
         $sql = "SELECT 
                     pr.機台, 
                     pr.工單號, 
                     pr.品名,
-                    ud.利潤中心 AS NP碼,  -- Corrected: NP碼 is 利潤中心
+                    ud.利潤中心 AS NP碼,
                     pr.班別, 
                     pr.箱數, 
                     pr.重量, 
                     pr.數量,
-                    pr.單重
+                    pr.單重,
+                    pr.異常
                 FROM 生產紀錄表 pr
                 LEFT JOIN uploaded_data ud ON BINARY pr.工單號 = BINARY ud.工單號
                 WHERE pr.條碼編號 LIKE ?
@@ -52,8 +53,14 @@ function getDailyReportData($pdo) {
                     '品名' => $record['品名'],
                     '工單號碼' => $record['工單號'],
                     'NP碼' => $record['NP碼'],
-                    '日班淨重1' => null, '日班淨重2' => null, '日班淨重3' => null,
-                    '夜班淨重1' => null, '夜班淨重2' => null, '夜班淨重3' => null,
+                    '日班淨重1' => null, '日班淨重1_status' => null,
+                    '日班淨重2' => null, '日班淨重2_status' => null,
+                    '日班淨重3' => null, '日班淨重3_status' => null,
+                    '日班淨重4' => null, '日班淨重4_status' => null,
+                    '夜班淨重1' => null, '夜班淨重1_status' => null,
+                    '夜班淨重2' => null, '夜班淨重2_status' => null,
+                    '夜班淨重3' => null, '夜班淨重3_status' => null,
+                    '夜班淨重4' => null, '夜班淨重4_status' => null,
                     '單重' => '',
                     '日班數量' => 0,
                     '夜班數量' => 0,
@@ -65,10 +72,19 @@ function getDailyReportData($pdo) {
 
             $boxNum = intval($record['箱數']);
             if ($boxNum >= 1 && $boxNum <= 4) {
+                $shift = null;
                 if ($record['班別'] == '日') {
-                    $reportData[$key]['日班淨重' . $boxNum] = $record['重量'];
+                    $shift = '日班';
                 } elseif ($record['班別'] == '夜' || $record['班別'] == '中') {
-                    $reportData[$key]['夜班淨重' . $boxNum] = $record['重量'];
+                    $shift = '夜班';
+                }
+
+                if ($shift) {
+                    $weightField = $shift . '淨重' . $boxNum;
+                    $statusField = $weightField . '_status';
+                    $reportData[$key][$weightField] = $record['重量'];
+                    // Set status to '異常' if the '異常' column is 1
+                    $reportData[$key][$statusField] = ($record['異常'] == 1) ? '異常' : '合格';
                 }
             }
 
@@ -97,7 +113,7 @@ function getDailyReportData($pdo) {
             $row['累計'] = $cumulStmt->fetchColumn() ?? 0;
         }
 
-        sendResponse(true, '查詢成功', array_values($reportData));
+        sendResponse(true, '查詢成功', array_values($reportData), $dailyRecords);
 
     } catch (PDOException $e) {
         error_log('查詢日報表錯誤: ' . $e->getMessage());
@@ -138,13 +154,16 @@ function saveUnitWeights($pdo) {
     }
 }
 
-function sendResponse($success, $message, $data = null) {
+function sendResponse($success, $message, $data = null, $debug = null) {
     $response = [
         'success' => $success,
         'message' => $message
     ];
     if ($data !== null) {
         $response['data'] = $data;
+    }
+    if ($debug !== null) {
+        $response['debug'] = $debug;
     }
     // Ensure JSON is properly encoded
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
