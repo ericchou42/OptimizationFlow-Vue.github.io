@@ -86,12 +86,16 @@
             margin-top: 15px;
             margin-bottom: 20px;
         }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
         .action-buttons button {
             font-size: 24px;
             padding: 20px 30px;
-            margin: 10px;
-            width: 45%;
             border-radius: 10px;
+            flex: 1;
         }
         .hidden {
             display: none;
@@ -324,14 +328,15 @@
 
         <!-- 按鈕區域 -->
         <div class="action-buttons" v-if="productInfo">
-            <div class="d-flex justify-content-between">
-                <button @click="submitData('合格')" class="btn btn-success btn-lg btn-touch" :disabled="!canSubmit">
-                    <i class="bi bi-check-circle"></i> OK
-                </button>
-                <button @click="submitData('異常')" class="btn btn-danger btn-lg btn-touch" :disabled="!canSubmit">
-                    <i class="bi bi-exclamation-triangle"></i> NG
-                </button>
-            </div>
+            <button @click="submitData('合格')" class="btn btn-success btn-lg btn-touch" :disabled="!canSubmit">
+                <i class="bi bi-check-circle"></i> OK
+            </button>
+            <button @click="submitData('異常')" class="btn btn-danger btn-lg btn-touch" :disabled="!canSubmit">
+                <i class="bi bi-exclamation-triangle"></i> NG
+            </button>
+            <button @click="printLabel" class="btn btn-secondary btn-lg btn-touch" :disabled="!canSubmit">
+                <i class="bi bi-printer"></i> 列印
+            </button>
         </div>
 
         <!-- 訊息顯示區域 -->
@@ -525,6 +530,38 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                         showMessage('系統錯誤，請稍後再試', 'alert-danger');
                     }
                 };
+
+                const printLabel = () => {
+                    if (!canSubmit.value) {
+                        showMessage('請填寫所有必要資訊才能列印', 'alert-warning');
+                        return;
+                    }
+
+                    const data = {
+                        barcode: barcode.value,
+                        inspector: selectedInspectorName.value,
+                        weight: weight.value,
+                        unitWeight: unitWeight.value,
+                        quantity: parseInt(editedQuantity.value),
+                        status: '合格',
+                        productName: productInfo.value.品名,
+                        partNumber: productInfo.value.料號,
+                        workOrder: productInfo.value.工單號,
+                        machine: productInfo.value.機台,
+                        date: new Date().toLocaleString('zh-TW')
+                    };
+
+                    const queryParams = new URLSearchParams();
+                    for (const key in data) {
+                        if (data[key] !== null && data[key] !== undefined) {
+                            queryParams.append(key, data[key]);
+                        }
+                    }
+    
+                    const printUrl = `barcodePrint.html?${queryParams.toString()}`;
+                    window.open(printUrl, '_blank');
+                    showMessage('標籤準備列印...', 'alert-info');
+                };
                 
                 const resetForm = () => {
                     barcode.value = '';
@@ -599,7 +636,8 @@ const { createApp, ref, computed, onMounted, watch } = Vue;
                     resetForm,
                     toggleFullScreen,
                     toggleAdditionalInfo,
-                    usePreviousUnitWeight
+                    usePreviousUnitWeight,
+                    printLabel
                 };
             }
         }).mount('#app');
