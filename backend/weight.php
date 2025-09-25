@@ -123,17 +123,32 @@ function getProductInfo() {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($result) {
-            // 獲取同一工單號的前一筆檢驗資料
+            // 如果目前的紀錄沒有單重，就去尋找最適合的歷史單重
             if (empty($result['單重']) || floatval($result['單重']) <= 0) {
-                $workOrder = $result['工單號'];
+                $productName = $result['品名'];
+                $machine = $result['機台'];
+
+                // 優先查詢相同機台、相同品名的最新一筆單重
                 $prevSql = "SELECT 單重 
                            FROM 生產紀錄表 
-                           WHERE 工單號 = ? AND 檢驗狀態 = 1 AND 單重 > 0 
+                           WHERE 機台 = ? AND 品名 = ? AND 檢驗狀態 = 1 AND 單重 > 0 
                            ORDER BY 檢驗時間 DESC 
                            LIMIT 1";
                 $prevStmt = $pdo->prepare($prevSql);
-                $prevStmt->execute([$workOrder]);
+                $prevStmt->execute([$machine, $productName]);
                 $prevResult = $prevStmt->fetch(PDO::FETCH_ASSOC);
+
+                // 如果找不到，則放寬條件，查詢相同品名的最新一筆單重 (不限機台)
+                if (!$prevResult || floatval($prevResult['單重']) <= 0) {
+                    $prevSql = "SELECT 單重 
+                               FROM 生產紀錄表 
+                               WHERE 品名 = ? AND 檢驗狀態 = 1 AND 單重 > 0 
+                               ORDER BY 檢驗時間 DESC 
+                               LIMIT 1";
+                    $prevStmt = $pdo->prepare($prevSql);
+                    $prevStmt->execute([$productName]);
+                    $prevResult = $prevStmt->fetch(PDO::FETCH_ASSOC);
+                }
                 
                 if ($prevResult && floatval($prevResult['單重']) > 0) {
                     $result['前一筆單重'] = floatval($prevResult['單重']);
