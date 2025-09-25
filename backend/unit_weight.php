@@ -135,13 +135,13 @@ function saveUnitWeights($pdo) {
     $pdo->beginTransaction();
 
     try {
-        $sql = "UPDATE 生產紀錄表 SET 單重 = ? WHERE 工單號 = ? AND 條碼編號 LIKE ?";
+        $sql = "UPDATE 生產紀錄表 SET 單重 = ? WHERE 工單號 = ? AND 機台 = ? AND 條碼編號 LIKE ?";
         $stmt = $pdo->prepare($sql);
 
         foreach ($weightsToSave as $item) {
-            if (isset($item['工單號碼']) && isset($item['單重']) && is_numeric($item['單重']) && $item['單重'] > 0) {
+            if (isset($item['工單號碼']) && isset($item['機台']) && isset($item['單重']) && is_numeric($item['單重']) && $item['單重'] > 0) {
                 $likePattern = $dateYmd . '%';
-                $stmt->execute([$item['單重'], $item['工單號碼'], $likePattern]);
+                $stmt->execute([$item['單重'], $item['工單號碼'], $item['機台'], $likePattern]);
             }
         }
 
